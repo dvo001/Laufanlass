@@ -1,0 +1,19 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<FilesMatch "^(composer\.(json|lock)|README\.md)$">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+
+# Keep private application files out of the public web when a shared hoster
+# points the domain at the project root instead of the public/ directory.
+RewriteRule ^(\.git|app|config|database|docs|scripts|storage|tests|vendor)(/|$) - [F,L]
+
+# In root-web deployments, expose the normal public assets at /assets/...
+RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ public/index.php [QSA,L]

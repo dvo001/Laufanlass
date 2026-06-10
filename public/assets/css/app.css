@@ -77,6 +77,36 @@ h3 { margin: 18px 0 8px; font-size: 17px; letter-spacing: 0; }
     margin: 12px 0 18px;
 }
 
+.inline-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.inline-form select {
+    width: auto;
+    min-width: 160px;
+}
+
+.inline-form input {
+    width: auto;
+}
+
+.category-form {
+    display: grid;
+    grid-template-columns: minmax(120px, 1.4fr) 95px 95px 95px minmax(150px, 1fr) 110px auto;
+    margin-bottom: 8px;
+}
+
+.category-form select {
+    min-width: 110px;
+}
+
+.category-form span {
+    color: var(--muted);
+}
+
 .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -143,6 +173,8 @@ button, .button {
 button:hover, .button:hover { background: var(--accent-dark); color: #fff; }
 .button.secondary { background: #475569; }
 .button.light { background: #e2e8f0; color: #1f2937; }
+button.danger, .button.danger { background: var(--bad); }
+button.danger:hover, .button.danger:hover { background: #991b1b; }
 
 table {
     width: 100%;
@@ -200,8 +232,25 @@ th {
 .run-sheet-header {
     position: relative;
     z-index: 1;
-    min-height: 20mm;
-    padding-top: 1mm;
+    display: table;
+    width: 100%;
+    min-height: 31mm;
+    padding-top: 0;
+    margin-bottom: 5mm;
+}
+
+.run-sheet-logo-cell,
+.run-sheet-title {
+    display: table-cell;
+    vertical-align: middle;
+}
+
+.run-sheet-logo-cell {
+    width: 31mm;
+}
+
+.run-sheet-title {
+    padding-right: 31mm;
     text-align: center;
 }
 
@@ -222,7 +271,7 @@ th {
     display: block;
     width: 29mm;
     height: auto;
-    margin: -5mm 0 6mm -1mm;
+    margin: 0;
 }
 
 .runner-number {
@@ -352,6 +401,7 @@ th {
     .app { display: block; }
     .main { padding: 0; max-width: none; }
     .main > h1 { display: none; }
+    .printable .main > h1 { display: block; }
     .panel { border: 0; padding: 0; }
     a { color: #000; text-decoration: none; }
     .sheet-grid { page: run-sheet-page; }

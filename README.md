@@ -9,7 +9,7 @@ CSV-Export.
 - Ubuntu Server 24.04 LTS oder neuer
 - Apache 2 mit Rewrite-Modul
 - MariaDB oder MySQL
-- PHP 8.3 oder neuer mit PDO MySQL
+- PHP 8.1 oder neuer mit PDO MySQL
 - Optional Composer und `dompdf/dompdf` fuer echte PDF-Ausgaben
 
 ## Installation Kurzfassung
@@ -67,6 +67,24 @@ mysql -u sportlauf_user -p sportlauf < database/seed.sql
     </Directory>
 </VirtualHost>
 ```
+
+## Externer Hoster
+
+Fuer den Betrieb bei einem externen PHP/MySQL-Hoster gibt es eine eigene
+Anleitung:
+
+```text
+docs/EXTERNER_HOSTER.md
+```
+
+Kurzfassung:
+
+- Ideal: Domain-DocumentRoot auf `public/` setzen.
+- Alternativ: Projekt in den Webordner hochladen; die Root-`.htaccess` leitet
+  intern nach `public/index.php` weiter und sperrt private Ordner.
+- `config/database.hosting.php` nach `config/database.php` kopieren und die
+  Datenbankdaten des Hosters eintragen.
+- `database/schema.sql` in phpMyAdmin/Adminer importieren.
 
 ## Bedienablauf
 

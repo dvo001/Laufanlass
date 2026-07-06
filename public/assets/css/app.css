@@ -42,6 +42,19 @@ a { color: var(--accent-dark); }
     margin-bottom: 22px;
 }
 
+.event-switcher {
+    margin: 0 0 18px;
+}
+
+.event-switcher label {
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.event-switcher select {
+    border-color: #47647d;
+}
+
 .nav {
     display: grid;
     gap: 6px;
@@ -113,6 +126,10 @@ h3 { margin: 18px 0 8px; font-size: 17px; letter-spacing: 0; }
     border-radius: 8px;
     padding: 18px;
     margin: 0 0 18px;
+}
+
+.event-card h3 {
+    margin-top: 0;
 }
 
 .grid {
@@ -252,6 +269,10 @@ th {
 .run-sheet-title {
     padding-right: 31mm;
     text-align: center;
+}
+
+.run-sheet-title.no-logo {
+    padding-right: 0;
 }
 
 .run-sheet-header h2 {

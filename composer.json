@@ -1,6 +1,6 @@
 {
   "name": "dvo001/laufanlass",
-  "description": "Lokale LAMP-Webapplikation fuer einen Kinder-Laufanlass mit Qualifikation und Finallauf.",
+  "description": "Lokale LAMP-Webapplikation fuer konfigurierbare Laufanlaesse mit optionalem Finallauf.",
   "type": "project",
   "require": {
     "php": ">=8.1"

@@ -18,8 +18,7 @@ zip -r "$PACKAGE" \
   app \
   config/database.example.php \
   config/database.hosting.php \
-  database/schema.sql \
-  database/seed.sql \
+  database \
   docs/EXTERNER_HOSTER.md \
   public \
   storage/exports/.gitkeep \

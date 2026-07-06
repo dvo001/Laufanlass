@@ -1,8 +1,8 @@
-# Laufanlass
+# Laufanlaesse
 
-Lokale LAMP-Webapplikation fuer einen Kinder-Laufanlass mit Teilnehmererfassung,
-Qualifikationszeiten, Finalistenlogik, Finalzeiten, Ranglisten, Laufzetteln und
-CSV-Export.
+Lokale LAMP-Webapplikation fuer unterschiedliche Laufanlaesse mit Teilnehmererfassung,
+konfigurierbaren Qualifikationslaeufen und Finalplaetzen, Finalzeiten, Ranglisten,
+Laufzetteln und CSV-Export.
 
 ## Systemvoraussetzungen
 
@@ -52,6 +52,15 @@ mysql -u sportlauf_user -p sportlauf < database/schema.sql
 mysql -u sportlauf_user -p sportlauf < database/seed.sql
 ```
 
+Bei einer bestehenden Installation einmalig die Anlass-Konfiguration ergaenzen:
+
+```bash
+mysql -u sportlauf_user -p sportlauf < database/migrations/20260706_event_configuration.sql
+```
+
+Ein optionales Anlasslogo kann in `public/assets/img/` abgelegt und beim Anlass
+beispielsweise als `/assets/img/mein-logo.png` eingetragen werden.
+
 ## Apache VirtualHost
 
 `public/` muss der einzige DocumentRoot sein:
@@ -88,13 +97,13 @@ Kurzfassung:
 
 ## Bedienablauf
 
-1. Anlass erstellen und aktiv setzen.
-2. Jahrgangsgruppen erfassen; Ueberlappungen werden verhindert.
-3. Teilnehmer mit Laufzettel-ID erfassen.
-4. Qualifikationszeiten separat oder per Schnellerfassung erfassen.
-5. Qualifikationsrangliste pruefen.
-6. Finalisten vorschlagen und manuell bestaetigen.
-7. Finalzeiten oder Finalstatus erfassen.
+1. Anlass mit einem oder zwei Qualifikationslaeufen sowie optionalem Finale erstellen.
+2. Anlass in der linken Navigation auswaehlen.
+3. Jahrgangsgruppen erfassen oder beim Erstellen von einem bestehenden Anlass uebernehmen; Ueberlappungen werden verhindert.
+4. Teilnehmer mit Laufzettel-ID erfassen.
+5. Qualifikationszeiten separat oder per Schnellerfassung erfassen.
+6. Qualifikationsrangliste pruefen.
+7. Falls konfiguriert: Finalisten vorschlagen, bestaetigen und Finalzeiten erfassen.
 8. Endrangliste drucken, als PDF anzeigen oder CSV exportieren.
 
 ## PDF

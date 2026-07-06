@@ -65,6 +65,9 @@ Im Hosting-Panel:
 3. `database/schema.sql` importieren.
 4. Optional `database/seed.sql` importieren, wenn Beispieldaten gewuenscht sind.
 
+Bei einem Update einer bestehenden Installation danach einmalig
+`database/migrations/20260706_event_configuration.sql` importieren.
+
 Dann:
 
 ```bash

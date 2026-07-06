@@ -11,26 +11,22 @@ final class FinalistService
     {
     }
 
-    public function propose(int $eventId): array
+    public function propose(int $eventId, int $finalistsPerGroup = 3): array
     {
+        $finalistsPerGroup = max(1, min(99, $finalistsPerGroup));
         $groups = $this->rankingService->qualificationRows($eventId);
         $proposal = [];
         $warnings = [];
 
         foreach ($groups as $groupName => $rows) {
-            $top = array_slice($rows, 0, 3);
-            $third = $top[2]['best_qualification_time_tenths'] ?? null;
-            $tieRows = [];
-            if ($third !== null) {
-                $tieRows = array_values(array_filter($rows, static fn (array $row): bool => (int)$row['best_qualification_time_tenths'] === (int)$third));
-                if (count($tieRows) > 1) {
-                    $warnings[$groupName] = 'Gleichstand auf dem dritten Qualifikationsrang pruefen.';
-                }
+            $selection = self::selectionForRows($rows, $finalistsPerGroup);
+            if (count($selection['tie_rows']) > 1) {
+                $warnings[$groupName] = sprintf('Gleichstand auf Qualifikationsrang %d pruefen.', $finalistsPerGroup);
             }
 
             $proposal[$groupName] = [
-                'rows' => $top,
-                'tie_rows' => $tieRows,
+                'rows' => $selection['rows'],
+                'tie_rows' => $selection['tie_rows'],
                 'warning' => $warnings[$groupName] ?? null,
             ];
         }
@@ -38,7 +34,20 @@ final class FinalistService
         return ['groups' => $proposal, 'warnings' => $warnings];
     }
 
-    public function applyProposal(int $eventId): void
+    public static function selectionForRows(array $rows, int $finalistsPerGroup): array
+    {
+        $finalistsPerGroup = max(1, min(99, $finalistsPerGroup));
+        $top = array_slice($rows, 0, $finalistsPerGroup);
+        $lastQualifyingTime = $top[$finalistsPerGroup - 1]['best_qualification_time_tenths'] ?? null;
+        $tieRows = $lastQualifyingTime === null ? [] : array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => (int)$row['best_qualification_time_tenths'] === (int)$lastQualifyingTime
+        ));
+
+        return ['rows' => $top, 'tie_rows' => $tieRows];
+    }
+
+    public function applyProposal(int $eventId, int $finalistsPerGroup = 3): void
     {
         $this->pdo->prepare(
             'UPDATE results r
@@ -47,7 +56,7 @@ final class FinalistService
              WHERE p.event_id = :event_id'
         )->execute(['event_id' => $eventId]);
 
-        foreach ($this->propose($eventId)['groups'] as $group) {
+        foreach ($this->propose($eventId, $finalistsPerGroup)['groups'] as $group) {
             foreach ($group['rows'] as $row) {
                 $this->markSuggested((int)$row['id']);
             }
@@ -62,17 +71,25 @@ final class FinalistService
         $stmt->execute(['participant_id' => $participantId]);
     }
 
-    public function confirm(array $participantIds): void
+    public function confirm(int $eventId, array $participantIds): void
     {
+        $this->pdo->prepare(
+            'UPDATE results r
+             JOIN participants p ON p.id = r.participant_id
+             SET r.finalist_confirmed = 0
+             WHERE p.event_id = :event_id'
+        )->execute(['event_id' => $eventId]);
+
         if ($participantIds === []) {
             return;
         }
-
         $placeholders = implode(',', array_fill(0, count($participantIds), '?'));
         $stmt = $this->pdo->prepare(
-            "UPDATE results SET finalist_confirmed = 1, is_finalist = 1, final_status = 'qualified'
-             WHERE participant_id IN ($placeholders)"
+            "UPDATE results r
+             JOIN participants p ON p.id = r.participant_id
+             SET r.finalist_confirmed = 1, r.is_finalist = 1, r.final_status = 'qualified'
+             WHERE p.event_id = ? AND r.participant_id IN ($placeholders)"
         );
-        $stmt->execute(array_map('intval', $participantIds));
+        $stmt->execute([$eventId, ...array_map('intval', $participantIds)]);
     }
 }

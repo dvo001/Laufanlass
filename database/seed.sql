@@ -1,5 +1,5 @@
-INSERT INTO events (name, event_date, distance_label, time_window, status)
-SELECT 'dä schnälsti Winkler', '2026-09-05', '2x300m', NULL, 'active'
+INSERT INTO events (name, event_date, distance_label, time_window, logo_path, status)
+SELECT 'dä schnälsti Winkler', '2026-09-05', '2x300m', NULL, '/assets/img/laufblatt-logo.png', 'active'
 WHERE NOT EXISTS (SELECT 1 FROM events);
 
 SET @event_id := (

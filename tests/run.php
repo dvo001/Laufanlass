@@ -6,6 +6,7 @@ require_once dirname(__DIR__) . '/app/Services/RankingService.php';
 require_once dirname(__DIR__) . '/app/Services/FinalistService.php';
 
 use Sportlauf\Services\TimeParser;
+use Sportlauf\Services\FinalistService;
 
 $failures = 0;
 
@@ -40,5 +41,15 @@ foreach (['abc', '-1:00.0'] as $input) {
         assertSameValue('exception', 'exception', "invalid {$input}");
     }
 }
+
+$rankedRows = [
+    ['id' => 1, 'best_qualification_time_tenths' => 100],
+    ['id' => 2, 'best_qualification_time_tenths' => 110],
+    ['id' => 3, 'best_qualification_time_tenths' => 110],
+    ['id' => 4, 'best_qualification_time_tenths' => 120],
+];
+$selection = FinalistService::selectionForRows($rankedRows, 2);
+assertSameValue([1, 2], array_column($selection['rows'], 'id'), 'configurable finalist count');
+assertSameValue([2, 3], array_column($selection['tie_rows'], 'id'), 'tie at configurable cutoff');
 
 exit($failures > 0 ? 1 : 0);

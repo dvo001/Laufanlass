@@ -52,7 +52,10 @@ final class FinalistService
         $this->pdo->prepare(
             'UPDATE results r
              JOIN participants p ON p.id = r.participant_id
-             SET r.is_finalist = 0, r.final_status = "not_qualified"
+             SET r.is_finalist = 0,
+                 r.finalist_confirmed = 0,
+                 r.final_time_tenths = NULL,
+                 r.final_status = "not_qualified"
              WHERE p.event_id = :event_id'
         )->execute(['event_id' => $eventId]);
 

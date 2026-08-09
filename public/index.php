@@ -1040,11 +1040,12 @@ try {
     if ($path === '/rankings' && $method === 'GET') {
         render('Endrangliste', function (): void {
             $event = requireEvent();
-            $groups = (new RankingService(db()))->finalRows((int)$event['id']);
+            $finalEnabled = (int)$event['final_enabled'] === 1;
+            $groups = (new RankingService(db()))->endRows((int)$event['id'], $finalEnabled);
             ?><div class="toolbar"><a class="button light" href="/rankings/pdf?type=final">Druck/PDF</a><a class="button light" href="/export/csv">CSV</a></div><?php
             foreach ($groups as $group => $rows) {
                 echo '<h2>' . e($group) . '</h2>';
-                renderRankingTable($rows, $event, true);
+                renderRankingTable($rows, $event, $finalEnabled);
             }
         });
         return;
@@ -1054,15 +1055,17 @@ try {
         $event = requireEvent();
         $type = $_GET['type'] ?? 'final';
         $service = new RankingService(db());
-        $groups = $type === 'qualification' ? $service->qualificationRows((int)$event['id']) : $service->finalRows((int)$event['id']);
-        $html = printablePage($type === 'qualification' ? 'Qualifikationsrangliste' : 'Endrangliste', function () use ($event, $groups, $type): void {
+        $finalEnabled = (int)$event['final_enabled'] === 1;
+        $isQualification = $type === 'qualification';
+        $groups = $isQualification ? $service->qualificationRows((int)$event['id']) : $service->endRows((int)$event['id'], $finalEnabled);
+        $html = printablePage($isQualification ? 'Qualifikationsrangliste' : 'Endrangliste', function () use ($event, $groups, $isQualification, $finalEnabled): void {
             echo '<p>' . e($event['name']) . ' · ' . e(formatEventDate((string)$event['event_date'])) . ' · ' . e($event['distance_label']) . '</p>';
             foreach ($groups as $group => $rows) {
                 echo '<h2>' . e($group) . '</h2>';
-                renderRankingTable($rows, $event, $type !== 'qualification');
+                renderRankingTable($rows, $event, !$isQualification && $finalEnabled);
             }
         });
-        PdfService::output($html, eventFileName($event, $type === 'qualification' ? 'qualifikation' : 'endrangliste', 'pdf'));
+        PdfService::output($html, eventFileName($event, $isQualification ? 'qualifikation' : 'endrangliste', 'pdf'));
         return;
     }
 
@@ -1098,7 +1101,8 @@ try {
         }
         $header[] = 'Wertungsstatus';
         fputcsv($out, $header, ';');
-        foreach ((new RankingService(db()))->finalRows((int)$event['id']) as $group => $rows) {
+        $finalEnabled = (int)$event['final_enabled'] === 1;
+        foreach ((new RankingService(db()))->endRows((int)$event['id'], $finalEnabled) as $group => $rows) {
             foreach ($rows as $row) {
                 $csvRow = [
                     $row['rank'], $row['last_name'], $row['first_name'], $row['birth_year'],

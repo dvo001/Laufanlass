@@ -49,6 +49,11 @@ final class RankingService
         return $ranked;
     }
 
+    public function endRows(int $eventId, bool $finalEnabled): array
+    {
+        return $finalEnabled ? $this->finalRows($eventId) : $this->qualificationRows($eventId);
+    }
+
     public function flatFinalRows(int $eventId): array
     {
         $groups = array_values($this->finalRows($eventId));

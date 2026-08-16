@@ -421,6 +421,8 @@ Regeln:
 
 - Finalzeit wird ebenfalls in Zehntelsekunden gespeichert.
 - Finalteilnehmer werden im Endklassement nach Finalzeit sortiert.
+- Finalteilnehmer ohne gültige Finalzeit werden hinter allen gültigen Finalzeiten rangiert. Gibt es mehrere, bestimmt ihre beste Qualifikationszeit die Reihenfolge.
+- Die Endrangliste wird nach Wertungskategorien gegliedert und zeigt Rang, Name, Vorname, Jahrgang, beste Qualifikationszeit und die hervorgehobene Finalzeit.
 - Die Finalisten bilden die Plätze 1 bis 3 der Endrangliste.
 - Nicht-Finalisten werden nach ihrer Qualifikationszeit ab Platz 4 rangiert.
 - Wenn ein Finalteilnehmer im Finale keine gültige Zeit hat, muss der Status explizit gesetzt werden:
@@ -939,6 +941,8 @@ Funktionen:
   - nicht gestartet
   - aufgegeben
   - disqualifiziert
+- Eine separate, mobiloptimierte Finalerfassung erlaubt die Wahl von Anlass und Wertungskategorie. Pro Finalist stehen ein Zeitfeld, eine einzelne Speicheraktion und eine DNS-Schaltfläche zur Verfügung.
+- Die normale Finalerfassung zeigt einen lokal erzeugten QR-Code, der direkt zur mobilen Finalerfassung des gewählten Anlasses führt.
 - Automatische Vorschau der Endrangliste
 
 ## 8.11 Endrangliste

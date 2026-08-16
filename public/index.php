@@ -36,6 +36,13 @@ function redirect(string $path, ?string $message = null): never
     exit;
 }
 
+function absoluteUrl(string $path): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $scheme . '://' . $host . $path;
+}
+
 function config(): array
 {
     $file = dirname(__DIR__) . '/config/database.php';
@@ -104,6 +111,7 @@ function render(string $title, callable $content): void
         '/rankings/qualification' => 'Qualifikation',
         '/finalists' => 'Finalisten',
         '/final-results' => 'Finalzeiten',
+        '/mobile-final-results' => 'Mobile Finalerfassung',
         '/rankings' => 'Endrangliste',
         '/sheets/pdf' => 'Laufzettel',
         '/export/csv' => 'CSV Export',
@@ -119,7 +127,7 @@ function render(string $title, callable $content): void
     <title><?= e($title) ?> - Sportlauf</title>
     <link rel="stylesheet" href="/assets/css/app.css">
 </head>
-<body>
+<body class="<?= $path === '/mobile-final-results' ? 'mobile-final-page' : '' ?>">
 <div class="app">
     <aside class="sidebar">
         <div class="brand">Sportlauf</div>
@@ -303,6 +311,28 @@ function saveResult(int $participantId, array $data): void
 
 function renderRankingTable(array $rows, bool $final = false): void
 {
+    if ($final) {
+        ?><table>
+            <thead><tr>
+                <th>Rang</th><th>Name</th><th>Vorname</th><th>Jahrgang</th><th>Beste Qualifikationszeit</th><th><strong>Finalzeit</strong></th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($rows as $row): ?>
+                <?php $finalValue = $row['final_time_tenths'] !== null ? TimeParser::format((int)$row['final_time_tenths']) : strtoupper((string)$row['final_status']); ?>
+                <tr>
+                    <td><?= (int)$row['rank'] ?></td>
+                    <td><?= e($row['last_name']) ?></td>
+                    <td><?= e($row['first_name']) ?></td>
+                    <td><?= e((string)$row['birth_year']) ?></td>
+                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
+                    <td><strong><?= e($finalValue) ?></strong></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table><?php
+        return;
+    }
+
     ?><table>
         <thead><tr>
             <th>Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Klasse</th><th>Ort</th>
@@ -821,6 +851,147 @@ try {
         redirect('/final-results', 'Finalzeiten gespeichert.');
     }
 
+    if ($path === '/mobile-final-results/save' && $method === 'POST') {
+        $eventId = (int)($_POST['event_id'] ?? 0);
+        $categoryId = (int)($_POST['category_id'] ?? 0);
+        $participantId = (int)($_POST['participant_id'] ?? 0);
+        $gender = (string)($_POST['gender'] ?? '');
+        $action = (string)($_POST['action'] ?? 'save');
+        if (!in_array($gender, ['female', 'male'], true)) {
+            throw new InvalidArgumentException('Ungueltige Finalkategorie.');
+        }
+
+        $time = $action === 'dns' ? null : TimeParser::parse($_POST['time'] ?? null);
+        if ($action !== 'dns' && $time === null) {
+            throw new InvalidArgumentException('Bitte eine Finalzeit eingeben oder DNS waehlen.');
+        }
+        $status = $action === 'dns' ? 'dns' : 'valid';
+        $stmt = db()->prepare(
+            'UPDATE results r JOIN participants p ON p.id = r.participant_id
+             SET r.final_time_tenths = :time, r.final_status = :status
+             WHERE r.participant_id = :participant_id AND r.finalist_confirmed = 1
+               AND p.event_id = :event_id AND p.category_id = :category_id AND p.gender = :gender'
+        );
+        $stmt->execute([
+            'time' => $time,
+            'status' => $status,
+            'participant_id' => $participantId,
+            'event_id' => $eventId,
+            'category_id' => $categoryId,
+            'gender' => $gender,
+        ]);
+
+        $query = http_build_query(['event_id' => $eventId, 'category_id' => $categoryId, 'gender' => $gender]);
+        redirect('/mobile-final-results?' . $query, $action === 'dns' ? 'DNS gespeichert.' : 'Finalzeit gespeichert.');
+    }
+
+    if ($path === '/mobile-final-results/qr' && $method === 'GET') {
+        $eventId = (int)($_GET['event_id'] ?? 0);
+        $stmt = db()->prepare('SELECT COUNT(*) FROM events WHERE id = :event_id');
+        $stmt->execute(['event_id' => $eventId]);
+        if ((int)$stmt->fetchColumn() !== 1) {
+            throw new RuntimeException('Anlass fuer QR-Code nicht gefunden.');
+        }
+
+        $target = absoluteUrl('/mobile-final-results?event_id=' . $eventId);
+        $qrCode = Endroid\QrCode\QrCode::create($target)
+            ->setErrorCorrectionLevel(Endroid\QrCode\ErrorCorrectionLevel::Medium)
+            ->setSize(360)
+            ->setMargin(16);
+        $result = (new Endroid\QrCode\Writer\SvgWriter())->write($qrCode);
+        header('Content-Type: ' . $result->getMimeType());
+        header('Cache-Control: no-store');
+        echo $result->getString();
+        exit;
+    }
+
+    if ($path === '/mobile-final-results' && $method === 'GET') {
+        $events = db()->query('SELECT id, name, event_date FROM events ORDER BY event_date DESC, id DESC')->fetchAll();
+        $eventIds = array_map(static fn (array $event): int => (int)$event['id'], $events);
+        $requestedEventId = (int)($_GET['event_id'] ?? 0);
+        $activeEventId = (int)(activeEvent()['id'] ?? 0);
+        $eventId = in_array($requestedEventId, $eventIds, true)
+            ? $requestedEventId
+            : (in_array($activeEventId, $eventIds, true) ? $activeEventId : ($eventIds[0] ?? 0));
+
+        $groups = [];
+        if ($eventId > 0) {
+            $stmt = db()->prepare(
+                'SELECT DISTINCT c.id, c.name, c.sort_order, p.gender
+                 FROM categories c
+                 JOIN participants p ON p.category_id = c.id
+                 JOIN results r ON r.participant_id = p.id AND r.finalist_confirmed = 1
+                 WHERE c.event_id = :event_id AND c.active = 1
+                 ORDER BY c.sort_order, c.name, p.gender'
+            );
+            $stmt->execute(['event_id' => $eventId]);
+            $groups = $stmt->fetchAll();
+        }
+
+        $categoryId = (int)($_GET['category_id'] ?? 0);
+        $gender = (string)($_GET['gender'] ?? '');
+        $selectedGroup = null;
+        foreach ($groups as $group) {
+            if ((int)$group['id'] === $categoryId && $group['gender'] === $gender) {
+                $selectedGroup = $group;
+                break;
+            }
+        }
+        if ($selectedGroup === null && $groups !== []) {
+            $selectedGroup = $groups[0];
+            $categoryId = (int)$selectedGroup['id'];
+            $gender = (string)$selectedGroup['gender'];
+        }
+
+        $finalists = [];
+        if ($selectedGroup !== null) {
+            $stmt = db()->prepare(
+                'SELECT p.id, p.last_name, p.first_name, p.birth_year,
+                        r.best_qualification_time_tenths, r.final_time_tenths, r.final_status
+                 FROM participants p JOIN results r ON r.participant_id = p.id
+                 WHERE p.event_id = :event_id AND p.category_id = :category_id
+                   AND p.gender = :gender AND r.finalist_confirmed = 1
+                 ORDER BY r.best_qualification_time_tenths, p.last_name, p.first_name'
+            );
+            $stmt->execute(['event_id' => $eventId, 'category_id' => $categoryId, 'gender' => $gender]);
+            $finalists = $stmt->fetchAll();
+        }
+
+        render('Mobile Finalerfassung', function () use ($events, $eventId, $groups, $categoryId, $gender, $finalists): void {
+            ?><div class="mobile-final-entry">
+                <?php if ($events === []): ?><div class="warning">Es ist noch kein Anlass vorhanden.</div><?php else: ?>
+                    <form method="get" action="/mobile-final-results" class="mobile-final-filter panel">
+                        <label>Anlass<select name="event_id" onchange="this.form.submit()">
+                            <?php foreach ($events as $event): ?><option value="<?= (int)$event['id'] ?>" <?= (int)$event['id'] === $eventId ? 'selected' : '' ?>><?= e($event['name']) ?> (<?= e(formatEventDate($event['event_date'])) ?>)</option><?php endforeach; ?>
+                        </select></label>
+                        <label>Kategorie<select name="group" onchange="const [categoryId, gender] = this.value.split(':'); this.form.category_id.value = categoryId; this.form.gender.value = gender; this.form.submit()">
+                            <?php foreach ($groups as $group): ?>
+                                <?php $selected = (int)$group['id'] === $categoryId && $group['gender'] === $gender; ?>
+                                <option value="<?= (int)$group['id'] ?>:<?= e($group['gender']) ?>" <?= $selected ? 'selected' : '' ?>><?= e($group['name']) ?> · <?= $group['gender'] === 'female' ? 'Maedchen' : 'Knaben' ?></option>
+                            <?php endforeach; ?>
+                        </select></label>
+                        <input type="hidden" name="category_id" value="<?= $categoryId ?>">
+                        <input type="hidden" name="gender" value="<?= e($gender) ?>">
+                        <noscript><button>Auswahl anzeigen</button></noscript>
+                    </form>
+                    <?php if ($groups === []): ?><div class="warning">Fuer diesen Anlass sind noch keine Finalisten bestaetigt.</div><?php endif; ?>
+                    <div class="mobile-final-list">
+                        <?php foreach ($finalists as $runner): ?>
+                            <form method="post" action="/mobile-final-results/save" class="mobile-final-runner panel">
+                                <input type="hidden" name="event_id" value="<?= $eventId ?>"><input type="hidden" name="category_id" value="<?= $categoryId ?>"><input type="hidden" name="gender" value="<?= e($gender) ?>"><input type="hidden" name="participant_id" value="<?= (int)$runner['id'] ?>">
+                                <div class="mobile-final-runner-name"><strong><?= e($runner['last_name']) ?> <?= e($runner['first_name']) ?></strong><span>Jg. <?= (int)$runner['birth_year'] ?> · Quali <?= e(TimeParser::format((int)$runner['best_qualification_time_tenths'])) ?></span></div>
+                                <label>Finalzeit<input name="time" inputmode="decimal" autocomplete="off" placeholder="z. B. 83.4" value="<?= e(TimeParser::format($runner['final_time_tenths'] !== null ? (int)$runner['final_time_tenths'] : null)) ?>"></label>
+                                <div class="mobile-final-actions"><button type="submit" name="action" value="save">Zeit speichern</button><button type="submit" name="action" value="dns" class="danger">DNS</button></div>
+                                <?php if ($runner['final_status'] === 'dns'): ?><div class="bad">Als DNS markiert</div><?php endif; ?>
+                            </form>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div><?php
+        });
+        return;
+    }
+
     if ($path === '/final-results' && $method === 'GET') {
         render('Finalzeiten erfassen', function (): void {
             $event = requireEvent();
@@ -831,6 +1002,8 @@ try {
                  ORDER BY c.sort_order, p.gender, p.last_name, p.first_name'
             );
             $stmt->execute(['event_id' => $event['id']]);
+            $mobileUrl = absoluteUrl('/mobile-final-results?event_id=' . (int)$event['id']);
+            ?><section class="final-qr panel"><div><h2>Mobile Finalerfassung</h2><p>QR-Code mit dem Smartphone scannen und Finalzeiten direkt mobil erfassen.</p><a href="<?= e($mobileUrl) ?>"><?= e($mobileUrl) ?></a></div><a href="<?= e($mobileUrl) ?>"><img src="/mobile-final-results/qr?event_id=<?= (int)$event['id'] ?>" alt="QR-Code zur mobilen Finalerfassung" width="220" height="220"></a></section><?php
             ?><form method="post" action="/final-results/save"><table><thead><tr><th>Gruppe</th><th>Name</th><th>Vorname</th><th>Finalzeit</th><th>Status</th></tr></thead><tbody><?php
             foreach ($stmt as $row) {
                 ?><tr>

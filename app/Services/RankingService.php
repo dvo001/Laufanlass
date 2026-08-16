@@ -32,21 +32,30 @@ final class RankingService
         $ranked = [];
 
         foreach ($groups as $groupKey => $groupRows) {
-            $finalists = array_values(array_filter($groupRows, static function (array $row): bool {
-                return (int)$row['finalist_confirmed'] === 1 && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
-            }));
-            $others = array_values(array_filter($groupRows, static function (array $row): bool {
-                return !((int)$row['finalist_confirmed'] === 1 && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid');
-            }));
-
-            usort($finalists, self::finalSorter(...));
-            usort($others, self::qualificationSorter(...));
-
-            $combined = array_merge($finalists, $others);
-            $ranked[$groupKey] = self::assignEndRanks($combined);
+            $ranked[$groupKey] = self::rankFinalGroup($groupRows);
         }
 
         return $ranked;
+    }
+
+    public static function rankFinalGroup(array $groupRows): array
+    {
+        $finalistsWithTime = array_values(array_filter($groupRows, static function (array $row): bool {
+            return (int)$row['finalist_confirmed'] === 1 && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
+        }));
+        $finalistsWithoutTime = array_values(array_filter($groupRows, static function (array $row): bool {
+            return (int)$row['finalist_confirmed'] === 1
+                && !($row['final_time_tenths'] !== null && $row['final_status'] === 'valid');
+        }));
+        $nonFinalists = array_values(array_filter($groupRows, static function (array $row): bool {
+            return (int)$row['finalist_confirmed'] !== 1;
+        }));
+
+        usort($finalistsWithTime, self::finalSorter(...));
+        usort($finalistsWithoutTime, self::qualificationSorter(...));
+        usort($nonFinalists, self::qualificationSorter(...));
+
+        return self::assignEndRanks(array_merge($finalistsWithTime, $finalistsWithoutTime, $nonFinalists));
     }
 
     public function flatFinalRows(int $eventId): array
@@ -112,17 +121,21 @@ final class RankingService
         $rank = 0;
         $position = 0;
         $previousTime = null;
-        $previousSegment = null;
+        $previousRankBucket = null;
 
         foreach ($rows as &$row) {
             $position++;
-            $isFinal = (int)$row['finalist_confirmed'] === 1 && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
-            $row['ranking_segment'] = $isFinal ? 'Finale' : 'Qualifikation';
-            $row['ranking_time_tenths'] = $isFinal ? $row['final_time_tenths'] : $row['best_qualification_time_tenths'];
-            if ($previousTime === null || (int)$row['ranking_time_tenths'] !== (int)$previousTime || $previousSegment !== $row['ranking_segment']) {
+            $isConfirmedFinalist = (int)$row['finalist_confirmed'] === 1;
+            $hasValidFinalTime = $isConfirmedFinalist && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
+            $rankBucket = $hasValidFinalTime ? 'final-time' : ($isConfirmedFinalist ? 'final-no-time' : 'qualification');
+            $row['ranking_segment'] = $hasValidFinalTime
+                ? 'Finale'
+                : ($isConfirmedFinalist ? 'Finale: ' . $row['final_status'] : 'Qualifikation');
+            $row['ranking_time_tenths'] = $hasValidFinalTime ? $row['final_time_tenths'] : $row['best_qualification_time_tenths'];
+            if ($previousTime === null || (int)$row['ranking_time_tenths'] !== (int)$previousTime || $previousRankBucket !== $rankBucket) {
                 $rank = $position;
                 $previousTime = $row['ranking_time_tenths'];
-                $previousSegment = $row['ranking_segment'];
+                $previousRankBucket = $rankBucket;
             }
             $row['rank'] = $rank;
         }

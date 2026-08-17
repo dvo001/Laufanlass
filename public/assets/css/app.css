@@ -420,6 +420,8 @@ th {
     .main > h1 { display: none; }
     .printable .main > h1 { display: block; }
     .panel { border: 0; padding: 0; }
+    .printable h2 { break-after: avoid-page; page-break-after: avoid; }
+    .printable table { break-inside: avoid-page; page-break-inside: avoid; }
     a { color: #000; text-decoration: none; }
     .sheet-grid { page: run-sheet-page; }
     .run-sheet {

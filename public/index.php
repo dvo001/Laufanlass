@@ -412,6 +412,41 @@ function renderConfirmedFinalists(array $groups): void
     }
 }
 
+function renderFullFinalistList(array $groups): void
+{
+    if ($groups === []) {
+        echo '<div class="warning">Keine Finalkategorien mit gueltigen Qualifikationszeiten vorhanden.</div>';
+        return;
+    }
+
+    foreach ($groups as $group => $data) {
+        echo '<h2>' . e($group) . '</h2>';
+        ?><table>
+            <thead><tr>
+                <th>Quali-Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Status</th><th>Laufzettel</th><th>Qualizeit</th>
+            </tr></thead>
+            <tbody><?php
+            foreach ($data['candidates'] as $row) {
+                $rank = (int)$row['rank'];
+                $confirmed = (int)$row['finalist_confirmed'] === 1;
+                $status = $confirmed
+                    ? ($rank > 3 ? 'Finalist (nachgerueckt)' : 'Finalist')
+                    : ($rank > 3 ? 'Nachruecker' : 'Vorgeschlagen');
+                ?><tr>
+                    <td><?= $rank ?></td>
+                    <td><?= e($row['last_name']) ?></td>
+                    <td><?= e($row['first_name']) ?></td>
+                    <td><?= (int)$row['birth_year'] ?></td>
+                    <td><?= e($status) ?></td>
+                    <td><?= e($row['sheet_number']) ?></td>
+                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
+                </tr><?php
+            }
+            ?></tbody>
+        </table><?php
+    }
+}
+
 function printablePage(string $title, callable $content): string
 {
     ob_start();
@@ -791,12 +826,6 @@ try {
         return;
     }
 
-    if ($path === '/finalists/apply' && $method === 'POST') {
-        $event = requireEvent();
-        (new FinalistService(db(), new RankingService(db())))->applyProposal((int)$event['id']);
-        redirect('/finalists', 'Finalistenvorschlag angewendet.');
-    }
-
     if ($path === '/finalists/confirm' && $method === 'POST') {
         $event = requireEvent();
         (new FinalistService(db(), new RankingService(db())))->confirm((int)$event['id'], array_map('intval', $_POST['participant_ids'] ?? []));
@@ -808,12 +837,8 @@ try {
             $event = requireEvent();
             $proposal = (new FinalistService(db(), new RankingService(db())))->propose((int)$event['id']);
             ?><div class="toolbar">
-                <form method="post" action="/finalists/apply"><button>Top 3 vorschlagen</button></form>
-                <a class="button light" href="/finalists/pdf">Bestaetigte drucken/PDF</a>
+                <a class="button light" href="/finalists/pdf">Finalisten inkl. Nachruecker drucken/PDF</a>
             </div><?php
-            if (($_GET['confirmed'] ?? '') === '1') {
-                echo '<div class="toolbar"><a class="button" href="/finalists/pdf">Finalistenliste jetzt drucken</a></div>';
-            }
             ?><form method="post" action="/finalists/confirm"><?php
             foreach ($proposal['groups'] as $group => $data) {
                 echo '<h2>' . e($group) . '</h2>';
@@ -835,10 +860,10 @@ try {
 
     if ($path === '/finalists/pdf' && $method === 'GET') {
         $event = requireEvent();
-        $groups = confirmedFinalistGroups((int)$event['id']);
-        $html = printablePage('Bestaetigte Finalisten', function () use ($event, $groups): void {
+        $groups = (new FinalistService(db(), new RankingService(db())))->propose((int)$event['id'])['groups'];
+        $html = printablePage('Finalistenliste', function () use ($event, $groups): void {
             echo '<p>' . e($event['name']) . ' - ' . e(formatEventDate((string)$event['event_date'])) . '</p>';
-            renderConfirmedFinalists($groups);
+            renderFullFinalistList($groups);
         });
         PdfService::output($html, 'finalistenliste.pdf');
         return;

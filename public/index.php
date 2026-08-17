@@ -576,8 +576,8 @@ try {
             redirect('/categories');
         }
         $stmt = db()->prepare(
-            'INSERT INTO categories (event_id, name, year_from, year_to, sort_order, active)
-             VALUES (:event_id, :name, :year_from, :year_to, :sort_order, :active)'
+            'INSERT INTO categories (event_id, name, year_from, year_to, sort_order, active, has_final)
+             VALUES (:event_id, :name, :year_from, :year_to, :sort_order, :active, :has_final)'
         );
         $stmt->execute([
             'event_id' => $eventId,
@@ -586,6 +586,7 @@ try {
             'year_to' => $to,
             'sort_order' => (int)($_POST['sort_order'] ?? 0),
             'active' => $active,
+            'has_final' => (int)($_POST['has_final'] ?? 0),
         ]);
         redirect('/categories', 'Kategorie gespeichert.');
     }
@@ -605,7 +606,8 @@ try {
 
         $stmt = db()->prepare(
             'UPDATE categories
-             SET name = :name, year_from = :year_from, year_to = :year_to, sort_order = :sort_order, active = :active
+             SET name = :name, year_from = :year_from, year_to = :year_to,
+                 sort_order = :sort_order, active = :active, has_final = :has_final
              WHERE id = :id AND event_id = :event_id'
         );
         $stmt->execute([
@@ -614,6 +616,7 @@ try {
             'year_to' => $to,
             'sort_order' => (int)($_POST['sort_order'] ?? 0),
             'active' => $active,
+            'has_final' => (int)($_POST['has_final'] ?? 0),
             'id' => $categoryId,
             'event_id' => $eventId,
         ]);
@@ -645,11 +648,12 @@ try {
                 <label>Jahrgang bis<input required type="number" name="year_to"></label>
                 <label>Sortierung<input type="number" name="sort_order" value="0"></label>
                 <label>Aktiv<select name="active"><option value="1">Ja</option><option value="0">Nein</option></select></label>
+                <label>Finallauf<select name="has_final"><option value="1">Ja</option><option value="0">Nein, Vorlauf werten</option></select></label>
                 <div><button>Gruppe speichern</button></div>
             </form></div>
-            <table><thead><tr><th>Name</th><th>Von</th><th>Bis</th><th>Sortierung</th><th>Wertungsgruppen</th><th>Aktiv</th><th>Aktion</th></tr></thead><tbody><?php
+            <table><thead><tr><th>Name</th><th>Von</th><th>Bis</th><th>Sortierung</th><th>Wertungsgruppen</th><th>Aktiv</th><th>Finale</th><th>Aktion</th></tr></thead><tbody><?php
             foreach (categoriesForEvent((int)$event['id']) as $cat) {
-                echo '<tr><td colspan="7"><form class="inline-form category-form" method="post" action="/categories/update"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><input required name="name" value="' . e($cat['name']) . '"><input required type="number" name="year_from" value="' . (int)$cat['year_from'] . '"><input required type="number" name="year_to" value="' . (int)$cat['year_to'] . '"><input type="number" name="sort_order" value="' . (int)$cat['sort_order'] . '"><span>' . e($cat['name']) . ' Maedchen<br>' . e($cat['name']) . ' Knaben</span><select name="active"><option value="1"' . ((int)$cat['active'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['active'] ? '' : ' selected') . '>Nein</option></select><button>Speichern</button></form><form class="inline-form" method="post" action="/categories/delete" onsubmit="return confirm(\'Diese Jahrgangsgruppe wirklich loeschen? Zugeordnete Teilnehmende haben danach keine Kategorie mehr.\')"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><button class="danger">Loeschen</button></form></td></tr>';
+                echo '<tr><td colspan="8"><form class="inline-form category-form" method="post" action="/categories/update"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><input required name="name" value="' . e($cat['name']) . '"><input required type="number" name="year_from" value="' . (int)$cat['year_from'] . '"><input required type="number" name="year_to" value="' . (int)$cat['year_to'] . '"><input type="number" name="sort_order" value="' . (int)$cat['sort_order'] . '"><span>' . e($cat['name']) . ' Maedchen<br>' . e($cat['name']) . ' Knaben</span><select name="active"><option value="1"' . ((int)$cat['active'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['active'] ? '' : ' selected') . '>Nein</option></select><select name="has_final"><option value="1"' . ((int)$cat['has_final'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['has_final'] ? '' : ' selected') . '>Nein, Vorlauf</option></select><button>Speichern</button></form><form class="inline-form" method="post" action="/categories/delete" onsubmit="return confirm(\'Diese Jahrgangsgruppe wirklich loeschen? Zugeordnete Teilnehmende haben danach keine Kategorie mehr.\')"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><button class="danger">Loeschen</button></form></td></tr>';
             }
             ?></tbody></table><?php
         });
@@ -794,7 +798,8 @@ try {
     }
 
     if ($path === '/finalists/confirm' && $method === 'POST') {
-        (new FinalistService(db(), new RankingService(db())))->confirm(array_map('intval', $_POST['participant_ids'] ?? []));
+        $event = requireEvent();
+        (new FinalistService(db(), new RankingService(db())))->confirm((int)$event['id'], array_map('intval', $_POST['participant_ids'] ?? []));
         redirect('/finalists?confirmed=1', 'Finalisten bestaetigt.');
     }
 
@@ -816,9 +821,10 @@ try {
                     echo '<div class="warning">' . e($data['warning']) . '</div>';
                 }
                 echo '<table><thead><tr><th>Bestaetigen</th><th>Name</th><th>Vorname</th><th>Qualizeit</th><th>Hinweis</th></tr></thead><tbody>';
-                foreach ($data['rows'] as $row) {
+                foreach ($data['candidates'] as $index => $row) {
                     $tie = in_array($row, $data['tie_rows'], true) && count($data['tie_rows']) > 1;
-                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '" checked></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_tenths'])) . '</td><td>' . ($tie ? 'Gleichstand pruefen' : '') . '</td></tr>';
+                    $hint = $tie ? 'Gleichstand pruefen' : ($index >= 3 ? 'Nachruecker Rang ' . ($index + 1) : 'Direkt qualifiziert');
+                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '"' . ($index < 3 ? ' checked' : '') . '></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_tenths'])) . '</td><td>' . e($hint) . '</td></tr>';
                 }
                 echo '</tbody></table>';
             }
@@ -839,11 +845,17 @@ try {
     }
 
     if ($path === '/final-results/save' && $method === 'POST') {
+        $event = requireEvent();
+        $finalistService = new FinalistService(db(), new RankingService(db()));
         foreach ($_POST['final'] ?? [] as $participantId => $data) {
             $time = TimeParser::parse($data['time'] ?? null);
             $status = $time === null ? ($data['status'] ?? 'qualified') : 'valid';
-            if (!in_array($status, ['qualified', 'valid', 'dns', 'dnf', 'dsq'], true)) {
+            if (!in_array($status, ['qualified', 'valid', 'present_no_run', 'absent', 'dnf', 'dsq'], true)) {
                 $status = 'qualified';
+            }
+            if ($status === 'absent') {
+                $finalistService->markAbsentAndPromote((int)$event['id'], (int)$participantId);
+                continue;
             }
             $stmt = db()->prepare('UPDATE results SET final_time_tenths = :time, final_status = :status WHERE participant_id = :id');
             $stmt->execute(['time' => $time, 'status' => $status, 'id' => (int)$participantId]);
@@ -861,28 +873,33 @@ try {
             throw new InvalidArgumentException('Ungueltige Finalkategorie.');
         }
 
-        $time = $action === 'dns' ? null : TimeParser::parse($_POST['time'] ?? null);
-        if ($action !== 'dns' && $time === null) {
-            throw new InvalidArgumentException('Bitte eine Finalzeit eingeben oder DNS waehlen.');
+        $statusActions = ['present_no_run', 'absent'];
+        $time = in_array($action, $statusActions, true) ? null : TimeParser::parse($_POST['time'] ?? null);
+        if (!in_array($action, $statusActions, true) && $time === null) {
+            throw new InvalidArgumentException('Bitte eine Finalzeit eingeben oder einen Status waehlen.');
         }
-        $status = $action === 'dns' ? 'dns' : 'valid';
-        $stmt = db()->prepare(
+        $status = in_array($action, $statusActions, true) ? $action : 'valid';
+        if ($status === 'absent') {
+            (new FinalistService(db(), new RankingService(db())))->markAbsentAndPromote($eventId, $participantId);
+        } else {
+            $stmt = db()->prepare(
             'UPDATE results r JOIN participants p ON p.id = r.participant_id
              SET r.final_time_tenths = :time, r.final_status = :status
              WHERE r.participant_id = :participant_id AND r.finalist_confirmed = 1
                AND p.event_id = :event_id AND p.category_id = :category_id AND p.gender = :gender'
         );
-        $stmt->execute([
-            'time' => $time,
-            'status' => $status,
-            'participant_id' => $participantId,
-            'event_id' => $eventId,
-            'category_id' => $categoryId,
-            'gender' => $gender,
-        ]);
+            $stmt->execute([
+                'time' => $time,
+                'status' => $status,
+                'participant_id' => $participantId,
+                'event_id' => $eventId,
+                'category_id' => $categoryId,
+                'gender' => $gender,
+            ]);
+        }
 
         $query = http_build_query(['event_id' => $eventId, 'category_id' => $categoryId, 'gender' => $gender]);
-        redirect('/mobile-final-results?' . $query, $action === 'dns' ? 'DNS gespeichert.' : 'Finalzeit gespeichert.');
+        redirect('/mobile-final-results?' . $query, $action === 'save' ? 'Finalzeit gespeichert.' : 'Finalstatus gespeichert.');
     }
 
     if ($path === '/mobile-final-results/qr' && $method === 'GET') {
@@ -981,8 +998,8 @@ try {
                                 <input type="hidden" name="event_id" value="<?= $eventId ?>"><input type="hidden" name="category_id" value="<?= $categoryId ?>"><input type="hidden" name="gender" value="<?= e($gender) ?>"><input type="hidden" name="participant_id" value="<?= (int)$runner['id'] ?>">
                                 <div class="mobile-final-runner-name"><strong><?= e($runner['last_name']) ?> <?= e($runner['first_name']) ?></strong><span>Jg. <?= (int)$runner['birth_year'] ?> · Quali <?= e(TimeParser::format((int)$runner['best_qualification_time_tenths'])) ?></span></div>
                                 <label>Finalzeit<input name="time" inputmode="decimal" autocomplete="off" placeholder="z. B. 83.4" value="<?= e(TimeParser::format($runner['final_time_tenths'] !== null ? (int)$runner['final_time_tenths'] : null)) ?>"></label>
-                                <div class="mobile-final-actions"><button type="submit" name="action" value="save">Zeit speichern</button><button type="submit" name="action" value="dns" class="danger">DNS</button></div>
-                                <?php if ($runner['final_status'] === 'dns'): ?><div class="bad">Als DNS markiert</div><?php endif; ?>
+                                <div class="mobile-final-actions"><button type="submit" name="action" value="save">Zeit speichern</button><button type="submit" name="action" value="present_no_run">Am Start, nicht gelaufen</button><button type="submit" name="action" value="absent" class="danger">Nicht erschienen</button></div>
+                                <?php if ($runner['final_status'] === 'present_no_run'): ?><div class="bad">Automatisch Rang 3</div><?php elseif ($runner['final_status'] === 'absent'): ?><div class="bad">Nicht erschienen: Platzverlust</div><?php endif; ?>
                             </form>
                         <?php endforeach; ?>
                     </div>
@@ -1012,8 +1029,8 @@ try {
                     <td><?= e($row['first_name']) ?></td>
                     <td><input name="final[<?= (int)$row['id'] ?>][time]" value="<?= e(TimeParser::format($row['final_time_tenths'] !== null ? (int)$row['final_time_tenths'] : null)) ?>"></td>
                     <td><select name="final[<?= (int)$row['id'] ?>][status]">
-                        <?php foreach (['qualified', 'valid', 'dns', 'dnf', 'dsq'] as $status): ?>
-                            <option value="<?= e($status) ?>" <?= $row['final_status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option>
+                        <?php foreach (['qualified' => 'qualifiziert', 'valid' => 'gelaufen', 'present_no_run' => 'am Start, nicht gelaufen (Rang 3)', 'absent' => 'nicht erschienen (Platzverlust)', 'dnf' => 'nicht im Ziel', 'dsq' => 'disqualifiziert'] as $status => $label): ?>
+                            <option value="<?= e($status) ?>" <?= $row['final_status'] === $status ? 'selected' : '' ?>><?= e($label) ?></option>
                         <?php endforeach; ?>
                     </select></td>
                 </tr><?php

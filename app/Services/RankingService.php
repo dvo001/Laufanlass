@@ -32,6 +32,16 @@ final class RankingService
         $ranked = [];
 
         foreach ($groups as $groupKey => $groupRows) {
+            if ((int)($groupRows[0]['has_final'] ?? 1) !== 1) {
+                usort($groupRows, self::qualificationSorter(...));
+                $groupRows = self::assignRanks($groupRows, 'best_qualification_time_tenths');
+                foreach ($groupRows as &$row) {
+                    $row['ranking_segment'] = 'Qualifikation (kein Finale)';
+                }
+                unset($row);
+                $ranked[$groupKey] = $groupRows;
+                continue;
+            }
             $ranked[$groupKey] = self::rankFinalGroup($groupRows);
         }
 
@@ -45,14 +55,20 @@ final class RankingService
         }));
         $finalistsWithoutTime = array_values(array_filter($groupRows, static function (array $row): bool {
             return (int)$row['finalist_confirmed'] === 1
+                && $row['final_status'] !== 'absent'
                 && !($row['final_time_tenths'] !== null && $row['final_status'] === 'valid');
         }));
         $nonFinalists = array_values(array_filter($groupRows, static function (array $row): bool {
-            return (int)$row['finalist_confirmed'] !== 1;
+            return (int)$row['finalist_confirmed'] !== 1 || $row['final_status'] === 'absent';
         }));
 
         usort($finalistsWithTime, self::finalSorter(...));
-        usort($finalistsWithoutTime, self::qualificationSorter(...));
+        usort($finalistsWithoutTime, static function (array $a, array $b): int {
+            if ($a['final_status'] === 'present_no_run' || $b['final_status'] === 'present_no_run') {
+                return ($a['final_status'] === 'present_no_run' ? 1 : 0) <=> ($b['final_status'] === 'present_no_run' ? 1 : 0);
+            }
+            return self::qualificationSorter($a, $b);
+        });
         usort($nonFinalists, self::qualificationSorter(...));
 
         return self::assignEndRanks(array_merge($finalistsWithTime, $finalistsWithoutTime, $nonFinalists));
@@ -69,7 +85,7 @@ final class RankingService
         $stmt = $this->pdo->prepare(
             'SELECT p.*, c.name AS category_name, c.sort_order,
                     r.run1_time_tenths, r.run2_time_tenths, r.best_qualification_time_tenths,
-                    r.is_finalist, r.finalist_confirmed, r.final_time_tenths,
+                    r.is_finalist, r.finalist_confirmed, r.final_time_tenths, c.has_final,
                     r.qualification_status, r.final_status
              FROM participants p
              JOIN categories c ON c.id = p.category_id
@@ -126,6 +142,7 @@ final class RankingService
         foreach ($rows as &$row) {
             $position++;
             $isConfirmedFinalist = (int)$row['finalist_confirmed'] === 1;
+            $isPresentWithoutRun = $isConfirmedFinalist && $row['final_status'] === 'present_no_run';
             $hasValidFinalTime = $isConfirmedFinalist && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
             $rankBucket = $hasValidFinalTime ? 'final-time' : ($isConfirmedFinalist ? 'final-no-time' : 'qualification');
             $row['ranking_segment'] = $hasValidFinalTime
@@ -138,6 +155,10 @@ final class RankingService
                 $previousRankBucket = $rankBucket;
             }
             $row['rank'] = $rank;
+            if ($isPresentWithoutRun) {
+                $row['rank'] = 3;
+                $row['ranking_segment'] = 'Finale: am Start, nicht gelaufen';
+            }
         }
 
         return $rows;

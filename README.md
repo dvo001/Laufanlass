@@ -52,6 +52,12 @@ mysql -u sportlauf_user -p sportlauf < database/schema.sql
 mysql -u sportlauf_user -p sportlauf < database/seed.sql
 ```
 
+Bei einer bestehenden Installation die Reglement-Migration einmalig ausfuehren:
+
+```bash
+mysql -u sportlauf_user -p sportlauf < database/migrations/20260817_reglement_points_3_5.sql
+```
+
 ## Apache VirtualHost
 
 `public/` muss der einzige DocumentRoot sein:

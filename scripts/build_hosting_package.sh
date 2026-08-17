@@ -20,6 +20,7 @@ zip -r "$PACKAGE" \
   config/database.hosting.php \
   database/schema.sql \
   database/seed.sql \
+  database/migrations \
   docs/EXTERNER_HOSTER.md \
   public \
   storage/exports/.gitkeep \

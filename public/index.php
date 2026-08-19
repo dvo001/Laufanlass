@@ -335,7 +335,7 @@ function renderRankingTable(array $rows, bool $final = false): void
 
     ?><table>
         <thead><tr>
-            <th>Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Klasse</th><th>Ort</th>
+            <th>Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th>
             <th>Lauf 1</th><th>Lauf 2</th><th>Quali</th><th>Finale</th><th>Status</th>
         </tr></thead>
         <tbody>
@@ -345,8 +345,6 @@ function renderRankingTable(array $rows, bool $final = false): void
                 <td><?= e($row['last_name']) ?></td>
                 <td><?= e($row['first_name']) ?></td>
                 <td><?= e((string)$row['birth_year']) ?></td>
-                <td><?= e($row['school_class']) ?></td>
-                <td><?= e($row['city']) ?></td>
                 <td><?= e(TimeParser::format($row['run1_time_tenths'] !== null ? (int)$row['run1_time_tenths'] : null)) ?></td>
                 <td><?= e(TimeParser::format($row['run2_time_tenths'] !== null ? (int)$row['run2_time_tenths'] : null)) ?></td>
                 <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
@@ -391,7 +389,7 @@ function renderConfirmedFinalists(array $groups): void
         echo '<h2>' . e($group) . '</h2>';
         ?><table>
             <thead><tr>
-                <th>Start</th><th>Laufzettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Klasse</th><th>Ort</th><th>Qualizeit</th>
+                <th>Start</th><th>Laufzettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Qualizeit</th>
             </tr></thead>
             <tbody><?php
             $start = 1;
@@ -402,8 +400,6 @@ function renderConfirmedFinalists(array $groups): void
                     <td><?= e($row['last_name']) ?></td>
                     <td><?= e($row['first_name']) ?></td>
                     <td><?= (int)$row['birth_year'] ?></td>
-                    <td><?= e($row['school_class']) ?></td>
-                    <td><?= e($row['city']) ?></td>
                     <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
                 </tr><?php
             }
@@ -721,8 +717,6 @@ try {
                 <label>Vorname<input required name="first_name"></label>
                 <label>Jahrgang<input required type="number" name="birth_year"></label>
                 <label>Geschlecht<select name="gender"><option value="female">Mädchen</option><option value="male">Knabe</option></select></label>
-                <label>Klasse<input name="school_class"></label>
-                <label>Ort<input name="city"></label>
                 <label>Bemerkung<textarea name="notes"></textarea></label>
                 <div><button>Speichern und nächster Zettel</button></div>
             </form></div><?php
@@ -734,14 +728,14 @@ try {
         render('Teilnehmer', function (): void {
             $event = requireEvent();
             ?><div class="toolbar"><a class="button" href="/participants/create">Teilnehmer erfassen</a></div>
-            <table><thead><tr><th>Zettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Geschlecht</th><th>Kategorie</th><th>Klasse</th><th>Ort</th></tr></thead><tbody><?php
+            <table><thead><tr><th>Zettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Geschlecht</th><th>Kategorie</th></tr></thead><tbody><?php
             $stmt = db()->prepare(
                 'SELECT p.*, c.name AS category_name FROM participants p LEFT JOIN categories c ON c.id = p.category_id
                  WHERE p.event_id = :event_id ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number'
             );
             $stmt->execute(['event_id' => $event['id']]);
             foreach ($stmt as $p) {
-                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td><td>' . e($p['school_class']) . '</td><td>' . e($p['city']) . '</td></tr>';
+                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td></tr>';
             }
             ?></tbody></table><?php
         });
@@ -758,7 +752,7 @@ try {
             $event = requireEvent();
             $q = trim((string)($_GET['q'] ?? ''));
             ?><form class="toolbar" method="get">
-                <input name="q" value="<?= e($q) ?>" placeholder="Laufzettel-ID, Name, Vorname, Klasse">
+                <input name="q" value="<?= e($q) ?>" placeholder="Laufzettel-ID, Name oder Vorname">
                 <button>Suchen</button>
             </form><?php
             $sql = 'SELECT p.*, c.name AS category_name, r.run1_time_tenths, r.run2_time_tenths, r.best_qualification_time_tenths, r.qualification_status, r.notes AS result_notes
@@ -768,7 +762,7 @@ try {
                     WHERE p.event_id = :event_id';
             $params = ['event_id' => $event['id']];
             if ($q !== '') {
-                $sql .= ' AND (p.sheet_number LIKE :q OR p.last_name LIKE :q OR p.first_name LIKE :q OR p.school_class LIKE :q)';
+                $sql .= ' AND (p.sheet_number LIKE :q OR p.last_name LIKE :q OR p.first_name LIKE :q)';
                 $params['q'] = '%' . $q . '%';
             }
             $sql .= ' ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number LIMIT 80';
@@ -813,8 +807,6 @@ try {
                 <label>Vorname<input required name="first_name"></label>
                 <label>Jahrgang<input required type="number" name="birth_year"></label>
                 <label>Geschlecht<select name="gender"><option value="female">Mädchen</option><option value="male">Knabe</option></select></label>
-                <label>Klasse<input name="school_class"></label>
-                <label>Ort<input name="city"></label>
                 <label>Lauf 1<input name="run1_time" placeholder="1:23.4"></label>
                 <label>Lauf 2<input name="run2_time" placeholder="83.4"></label>
                 <div><button>Speichern und nächster Zettel</button></div>
@@ -1181,13 +1173,13 @@ try {
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="endrangliste.csv"');
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['Rang', 'Name', 'Vorname', 'Jahrgang', 'Geschlecht', 'Klasse', 'Ort', 'Kategorie', 'Lauf 1', 'Lauf 2', 'Beste Qualifikation', 'Finalist', 'Finalzeit', 'Wertungsstatus'], ';');
+        fputcsv($out, ['Rang', 'Name', 'Vorname', 'Jahrgang', 'Geschlecht', 'Kategorie', 'Lauf 1', 'Lauf 2', 'Beste Qualifikation', 'Finalist', 'Finalzeit', 'Wertungsstatus'], ';');
         foreach ((new RankingService(db()))->finalRows((int)$event['id']) as $group => $rows) {
             foreach ($rows as $row) {
                 fputcsv($out, [
                     $row['rank'], $row['last_name'], $row['first_name'], $row['birth_year'],
-                    $row['gender'] === 'female' ? 'Mädchen' : 'Knabe', $row['school_class'], $row['city'],
-                    $row['category_name'], TimeParser::format($row['run1_time_tenths'] !== null ? (int)$row['run1_time_tenths'] : null),
+                    $row['gender'] === 'female' ? 'Mädchen' : 'Knabe', $row['category_name'],
+                    TimeParser::format($row['run1_time_tenths'] !== null ? (int)$row['run1_time_tenths'] : null),
                     TimeParser::format($row['run2_time_tenths'] !== null ? (int)$row['run2_time_tenths'] : null),
                     TimeParser::format((int)$row['best_qualification_time_tenths']),
                     (int)$row['finalist_confirmed'] === 1 ? 'ja' : 'nein',

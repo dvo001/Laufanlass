@@ -80,6 +80,46 @@ final class RankingService
         return $groups === [] ? [] : array_merge(...$groups);
     }
 
+    public function fastestDailyTimes(int $eventId, int $limit = 3): array
+    {
+        return array_slice(self::rankDailyTimes($this->rankableRows($eventId)), 0, max(0, $limit));
+    }
+
+    public static function rankDailyTimes(array $rows): array
+    {
+        $ranked = [];
+        foreach ($rows as $row) {
+            $qualificationTime = $row['best_qualification_time_tenths'] !== null
+                ? (int)$row['best_qualification_time_tenths']
+                : null;
+            $finalTime = $row['final_status'] === 'valid' && $row['final_time_tenths'] !== null
+                ? (int)$row['final_time_tenths']
+                : null;
+            if ($qualificationTime === null && $finalTime === null) {
+                continue;
+            }
+
+            $row['daily_time_tenths'] = $finalTime !== null && ($qualificationTime === null || $finalTime < $qualificationTime)
+                ? $finalTime
+                : $qualificationTime;
+            $row['daily_time_source'] = $finalTime !== null && $finalTime === $qualificationTime
+                ? 'Qualifikation und Finale'
+                : ($row['daily_time_tenths'] === $finalTime ? 'Finale' : 'Qualifikation');
+            $ranked[] = $row;
+        }
+
+        usort($ranked, static fn (array $a, array $b): int =>
+            [$a['daily_time_tenths'], $a['last_name'], $a['first_name']]
+            <=> [$b['daily_time_tenths'], $b['last_name'], $b['first_name']]
+        );
+        foreach ($ranked as $index => &$row) {
+            $row['award_rank'] = $index + 1;
+        }
+        unset($row);
+
+        return $ranked;
+    }
+
     private function rankableRows(int $eventId): array
     {
         $stmt = $this->pdo->prepare(

@@ -5,12 +5,10 @@ use Sportlauf\Services\CategoryResolver;
 use Sportlauf\Services\FinalistService;
 use Sportlauf\Services\PdfService;
 use Sportlauf\Services\RankingService;
-use Sportlauf\Services\SheetNumberService;
 use Sportlauf\Services\TimeParser;
 
 require_once dirname(__DIR__) . '/app/Services/TimeParser.php';
 require_once dirname(__DIR__) . '/app/Services/CategoryResolver.php';
-require_once dirname(__DIR__) . '/app/Services/SheetNumberService.php';
 require_once dirname(__DIR__) . '/app/Services/RankingService.php';
 require_once dirname(__DIR__) . '/app/Services/FinalistService.php';
 require_once dirname(__DIR__) . '/app/Services/PdfService.php';
@@ -353,6 +351,30 @@ function renderRankingTable(array $rows, bool $final = false): void
             </tr>
         <?php endforeach; ?>
         </tbody>
+    </table><?php
+}
+
+function renderDailyAwards(array $rows): void
+{
+    echo '<h2>Sonderpreis: Schnellste Tageszeiten</h2>';
+    if ($rows === []) {
+        echo '<div class="warning">Noch keine gültigen Zeiten vorhanden.</div>';
+        return;
+    }
+
+    ?><table>
+        <thead><tr><th>Rang</th><th>Name</th><th>Vorname</th><th>Jahrgang</th><th>Kategorie</th><th>Zeit</th><th>Erzielt im</th></tr></thead>
+        <tbody><?php foreach ($rows as $row): ?>
+            <tr>
+                <td><?= (int)$row['award_rank'] ?></td>
+                <td><?= e($row['last_name']) ?></td>
+                <td><?= e($row['first_name']) ?></td>
+                <td><?= (int)$row['birth_year'] ?></td>
+                <td><?= e($row['category_name']) ?> <?= $row['gender'] === 'female' ? 'Mädchen' : 'Knaben' ?></td>
+                <td><strong><?= e(TimeParser::format((int)$row['daily_time_tenths'])) ?></strong></td>
+                <td><?= e($row['daily_time_source']) ?></td>
+            </tr>
+        <?php endforeach; ?></tbody>
     </table><?php
 }
 
@@ -706,14 +728,23 @@ try {
         redirect('/participants/create', 'Teilnehmer gespeichert.');
     }
 
+    if ($path === '/participants/delete' && $method === 'POST') {
+        $event = requireEvent();
+        $stmt = db()->prepare('DELETE FROM participants WHERE id = :id AND event_id = :event_id');
+        $stmt->execute([
+            'id' => (int)($_POST['id'] ?? 0),
+            'event_id' => (int)$event['id'],
+        ]);
+        redirect('/participants', $stmt->rowCount() > 0 ? 'Teilnehmer gelöscht.' : 'Teilnehmer nicht gefunden.');
+    }
+
     if ($path === '/participants/create' && $method === 'GET') {
         render('Teilnehmer erfassen', function (): void {
             $event = requireEvent();
-            $sheet = (new SheetNumberService(db()))->next((int)$event['id']);
-            ?><div class="panel"><form method="post" action="/participants" class="grid">
+            ?><div class="panel"><form method="post" action="/participants" class="grid" onkeydown="if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); this.requestSubmit(); }">
                 <input type="hidden" name="event_id" value="<?= (int)$event['id'] ?>">
-                <label>Laufzettel-ID<input required name="sheet_number" value="<?= e($sheet) ?>"></label>
-                <label>Name<input required name="last_name" autofocus></label>
+                <label>Laufzettel-ID<input required name="sheet_number" autofocus autocomplete="off"></label>
+                <label>Name<input required name="last_name"></label>
                 <label>Vorname<input required name="first_name"></label>
                 <label>Jahrgang<input required type="number" name="birth_year"></label>
                 <label>Geschlecht<select name="gender"><option value="female">Mädchen</option><option value="male">Knabe</option></select></label>
@@ -728,14 +759,14 @@ try {
         render('Teilnehmer', function (): void {
             $event = requireEvent();
             ?><div class="toolbar"><a class="button" href="/participants/create">Teilnehmer erfassen</a></div>
-            <table><thead><tr><th>Zettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Geschlecht</th><th>Kategorie</th></tr></thead><tbody><?php
+            <table><thead><tr><th>Zettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Geschlecht</th><th>Kategorie</th><th>Aktionen</th></tr></thead><tbody><?php
             $stmt = db()->prepare(
                 'SELECT p.*, c.name AS category_name FROM participants p LEFT JOIN categories c ON c.id = p.category_id
                  WHERE p.event_id = :event_id ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number'
             );
             $stmt->execute(['event_id' => $event['id']]);
             foreach ($stmt as $p) {
-                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td></tr>';
+                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td><td><form method="post" action="/participants/delete" onsubmit="return confirm(\'Diesen Teilnehmer wirklich löschen? Zugehörige Zeiten werden ebenfalls gelöscht.\')"><input type="hidden" name="id" value="' . (int)$p['id'] . '"><button class="danger" type="submit">Löschen</button></form></td></tr>';
             }
             ?></tbody></table><?php
         });
@@ -743,32 +774,48 @@ try {
     }
 
     if ($path === '/results/save' && $method === 'POST') {
-        saveResult((int)$_POST['participant_id'], $_POST);
-        redirect('/results', 'Zeit gespeichert.');
+        $event = requireEvent();
+        $participantId = (int)($_POST['participant_id'] ?? 0);
+        $stmt = db()->prepare('SELECT sheet_number FROM participants WHERE id = :id AND event_id = :event_id');
+        $stmt->execute(['id' => $participantId, 'event_id' => $event['id']]);
+        $sheetNumber = $stmt->fetchColumn();
+        if ($sheetNumber === false) {
+            throw new InvalidArgumentException('Teilnehmer für diesen Anlass nicht gefunden.');
+        }
+        saveResult($participantId, $_POST);
+        redirect('/results?' . http_build_query(['sheet_number' => $sheetNumber]), 'Zeit gespeichert.');
     }
 
     if ($path === '/results' && $method === 'GET') {
         render('Qualifikationszeiten erfassen', function (): void {
             $event = requireEvent();
-            $q = trim((string)($_GET['q'] ?? ''));
+            $sheetNumber = trim((string)($_GET['sheet_number'] ?? ''));
             ?><form class="toolbar" method="get">
-                <input name="q" value="<?= e($q) ?>" placeholder="Laufzettel-ID, Name oder Vorname">
-                <button>Suchen</button>
+                <label>Laufzettelnummer
+                    <input required autofocus autocomplete="off" inputmode="numeric" name="sheet_number" value="<?= e($sheetNumber) ?>" placeholder="Laufzettelnummer eingeben">
+                </label>
+                <button>Teilnehmer suchen</button>
             </form><?php
-            $sql = 'SELECT p.*, c.name AS category_name, r.run1_time_tenths, r.run2_time_tenths, r.best_qualification_time_tenths, r.qualification_status, r.notes AS result_notes
-                    FROM participants p
-                    LEFT JOIN categories c ON c.id = p.category_id
-                    LEFT JOIN results r ON r.participant_id = p.id
-                    WHERE p.event_id = :event_id';
-            $params = ['event_id' => $event['id']];
-            if ($q !== '') {
-                $sql .= ' AND (p.sheet_number LIKE :q OR p.last_name LIKE :q OR p.first_name LIKE :q)';
-                $params['q'] = '%' . $q . '%';
+            $participant = null;
+            if ($sheetNumber !== '' && ctype_digit($sheetNumber)) {
+                $stmt = db()->prepare(
+                    'SELECT p.*, c.name AS category_name, r.run1_time_tenths, r.run2_time_tenths,
+                            r.best_qualification_time_tenths, r.qualification_status, r.notes AS result_notes
+                     FROM participants p
+                     LEFT JOIN categories c ON c.id = p.category_id
+                     LEFT JOIN results r ON r.participant_id = p.id
+                     WHERE p.event_id = :event_id
+                       AND CAST(p.sheet_number AS UNSIGNED) = :sheet_number
+                     LIMIT 1'
+                );
+                $stmt->execute(['event_id' => $event['id'], 'sheet_number' => (int)$sheetNumber]);
+                $participant = $stmt->fetch() ?: null;
             }
-            $sql .= ' ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number LIMIT 80';
-            $stmt = db()->prepare($sql);
-            $stmt->execute($params);
-            foreach ($stmt as $p) {
+            if ($sheetNumber !== '' && $participant === null) {
+                ?><div class="warning">Kein Teilnehmer mit dieser Laufzettelnummer gefunden.</div><?php
+            }
+            if ($participant !== null) {
+                $p = $participant;
                 ?><div class="panel">
                     <h2><?= e($p['sheet_number']) ?> · <?= e($p['last_name']) ?> <?= e($p['first_name']) ?></h2>
                     <p class="muted"><?= e($p['category_name'] ?: 'ohne Kategorie') ?> · Beste Zeit: <?= e(TimeParser::format($p['best_qualification_time_tenths'] !== null ? (int)$p['best_qualification_time_tenths'] : null)) ?></p>
@@ -799,11 +846,10 @@ try {
     if ($path === '/quick-entry' && $method === 'GET') {
         render('Schnellerfassung', function (): void {
             $event = requireEvent();
-            $sheet = (new SheetNumberService(db()))->next((int)$event['id']);
-            ?><div class="panel"><form method="post" class="grid">
+            ?><div class="panel quick-entry-panel"><form method="post" class="grid quick-entry-grid">
                 <input type="hidden" name="event_id" value="<?= (int)$event['id'] ?>">
-                <label>Laufzettel-ID<input required name="sheet_number" value="<?= e($sheet) ?>"></label>
-                <label>Name<input required name="last_name" autofocus></label>
+                <label>Laufzettel-ID<input required name="sheet_number" autofocus autocomplete="off"></label>
+                <label>Name<input required name="last_name"></label>
                 <label>Vorname<input required name="first_name"></label>
                 <label>Jahrgang<input required type="number" name="birth_year"></label>
                 <label>Geschlecht<select name="gender"><option value="female">Mädchen</option><option value="male">Knabe</option></select></label>
@@ -851,7 +897,8 @@ try {
                 foreach ($data['candidates'] as $index => $row) {
                     $tie = in_array($row, $data['tie_rows'], true) && count($data['tie_rows']) > 1;
                     $hint = $tie ? 'Gleichstand prüfen' : ($index >= 3 ? 'Nachrücker Rang ' . ($index + 1) : 'Direkt qualifiziert');
-                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '"' . ($index < 3 ? ' checked' : '') . '></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_tenths'])) . '</td><td>' . e($hint) . '</td></tr>';
+                    $checked = in_array((int)$row['id'], $data['selected_ids'], true);
+                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '"' . ($checked ? ' checked' : '') . '></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_tenths'])) . '</td><td>' . e($hint) . '</td></tr>';
                 }
                 echo '</tbody></table>';
             }
@@ -1126,8 +1173,11 @@ try {
     if ($path === '/rankings' && $method === 'GET') {
         render('Endrangliste', function (): void {
             $event = requireEvent();
-            $groups = (new RankingService(db()))->finalRows((int)$event['id']);
+            $service = new RankingService(db());
+            $groups = $service->finalRows((int)$event['id']);
+            $dailyAwards = $service->fastestDailyTimes((int)$event['id']);
             ?><div class="toolbar"><a class="button light" href="/rankings/pdf?type=final">Druck/PDF</a><a class="button light" href="/export/csv">CSV</a></div><?php
+            renderDailyAwards($dailyAwards);
             foreach ($groups as $group => $rows) {
                 echo '<h2>' . e($group) . '</h2>';
                 renderRankingTable($rows, true);
@@ -1141,7 +1191,11 @@ try {
         $type = $_GET['type'] ?? 'final';
         $service = new RankingService(db());
         $groups = $type === 'qualification' ? $service->qualificationRows((int)$event['id']) : $service->finalRows((int)$event['id']);
-        $html = printablePage($type === 'qualification' ? 'Qualifikationsrangliste' : 'Endrangliste', function () use ($groups, $type): void {
+        $dailyAwards = $type === 'qualification' ? [] : $service->fastestDailyTimes((int)$event['id']);
+        $html = printablePage($type === 'qualification' ? 'Qualifikationsrangliste' : 'Endrangliste', function () use ($groups, $type, $dailyAwards): void {
+            if ($type !== 'qualification') {
+                renderDailyAwards($dailyAwards);
+            }
             foreach ($groups as $group => $rows) {
                 echo '<h2>' . e($group) . '</h2>';
                 renderRankingTable($rows, $type !== 'qualification');

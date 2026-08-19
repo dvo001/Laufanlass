@@ -53,4 +53,21 @@ assertSameValue([1, 2, 3, 4, 5], array_column($finalRows, 'id'), 'present non-ru
 assertSameValue(3, $finalRows[2]['rank'], 'present non-runner automatically receives rank three');
 assertSameValue('Finale: am Start, nicht gelaufen', $finalRows[2]['ranking_segment'], 'present non-runner gets explicit ranking segment');
 
+$dailyRows = RankingService::rankDailyTimes([
+    ['id' => 1, 'last_name' => 'A', 'first_name' => 'A', 'best_qualification_time_tenths' => 100, 'final_time_tenths' => 95, 'final_status' => 'valid'],
+    ['id' => 2, 'last_name' => 'B', 'first_name' => 'B', 'best_qualification_time_tenths' => 90, 'final_time_tenths' => 92, 'final_status' => 'valid'],
+    ['id' => 3, 'last_name' => 'C', 'first_name' => 'C', 'best_qualification_time_tenths' => 98, 'final_time_tenths' => 80, 'final_status' => 'dsq'],
+]);
+assertSameValue([2, 1, 3], array_column($dailyRows, 'id'), 'daily prizes use each participant best valid qualification or final time');
+assertSameValue(['Qualifikation', 'Finale', 'Qualifikation'], array_column($dailyRows, 'daily_time_source'), 'daily prize identifies the source run');
+
+$candidateRows = [
+    ['id' => 1, 'finalist_confirmed' => 1],
+    ['id' => 2, 'finalist_confirmed' => 0],
+    ['id' => 3, 'finalist_confirmed' => 1],
+    ['id' => 4, 'finalist_confirmed' => 1],
+];
+assertSameValue([1, 3, 4], Sportlauf\Services\FinalistService::selectionIds($candidateRows), 'saved replacement finalist selection is displayed');
+assertSameValue([1, 2, 3], Sportlauf\Services\FinalistService::selectionIds(array_map(static fn (array $row): array => array_merge($row, ['finalist_confirmed' => 0]), $candidateRows)), 'top three are selected before first confirmation');
+
 exit($failures > 0 ? 1 : 0);

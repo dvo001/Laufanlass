@@ -38,12 +38,33 @@ final class FinalistService
             $proposal[$groupName] = [
                 'rows' => $top,
                 'candidates' => $rows,
+                'selected_ids' => self::selectionIds($rows),
                 'tie_rows' => $tieRows,
                 'warning' => $warnings[$groupName] ?? null,
             ];
         }
 
         return ['groups' => $proposal, 'warnings' => $warnings];
+    }
+
+    public static function selectionIds(array $candidates): array
+    {
+        $confirmedIds = array_map(
+            static fn (array $row): int => (int)$row['id'],
+            array_values(array_filter(
+                $candidates,
+                static fn (array $row): bool => (int)($row['finalist_confirmed'] ?? 0) === 1
+            ))
+        );
+
+        if ($confirmedIds !== []) {
+            return $confirmedIds;
+        }
+
+        return array_map(
+            static fn (array $row): int => (int)$row['id'],
+            array_slice($candidates, 0, 3)
+        );
     }
 
     public function applyProposal(int $eventId): void

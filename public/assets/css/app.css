@@ -118,6 +118,21 @@ h3 { margin: 18px 0 8px; font-size: 17px; letter-spacing: 0; }
     gap: 14px;
 }
 
+.quick-entry-panel {
+    overflow-x: auto;
+}
+
+.quick-entry-grid {
+    grid-template-columns: 92px minmax(125px, 1fr) minmax(125px, 1fr) 92px 118px 100px 100px auto;
+    gap: 10px;
+    min-width: 990px;
+    align-items: end;
+}
+
+.quick-entry-grid button {
+    white-space: nowrap;
+}
+
 .metric {
     background: #fff;
     border: 1px solid var(--line);

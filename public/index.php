@@ -881,6 +881,8 @@ try {
 
     if ($path === '/final-results/save' && $method === 'POST') {
         $event = requireEvent();
+        $categoryId = (int)($_POST['category_id'] ?? 0);
+        $gender = (string)($_POST['gender'] ?? '');
         $finalistService = new FinalistService(db(), new RankingService(db()));
         foreach ($_POST['final'] ?? [] as $participantId => $data) {
             $time = TimeParser::parse($data['time'] ?? null);
@@ -895,7 +897,10 @@ try {
             $stmt = db()->prepare('UPDATE results SET final_time_tenths = :time, final_status = :status WHERE participant_id = :id');
             $stmt->execute(['time' => $time, 'status' => $status, 'id' => (int)$participantId]);
         }
-        redirect('/final-results', 'Finalzeiten gespeichert.');
+        $query = $categoryId > 0 && in_array($gender, ['female', 'male'], true)
+            ? '?' . http_build_query(['category_id' => $categoryId, 'gender' => $gender])
+            : '';
+        redirect('/final-results' . $query, 'Finalzeiten gespeichert.');
     }
 
     if ($path === '/mobile-final-results/save' && $method === 'POST') {
@@ -1047,17 +1052,67 @@ try {
     if ($path === '/final-results' && $method === 'GET') {
         render('Finalzeiten erfassen', function (): void {
             $event = requireEvent();
+            $groupStmt = db()->prepare(
+                'SELECT DISTINCT c.id, c.name, c.sort_order, p.gender
+                 FROM categories c
+                 JOIN participants p ON p.category_id = c.id
+                 JOIN results r ON r.participant_id = p.id AND r.finalist_confirmed = 1
+                 WHERE c.event_id = :event_id
+                 ORDER BY c.sort_order, c.name, p.gender'
+            );
+            $groupStmt->execute(['event_id' => $event['id']]);
+            $groups = $groupStmt->fetchAll();
+
+            $requestedGroup = explode(':', (string)($_GET['group'] ?? ''), 2);
+            $categoryId = isset($requestedGroup[1]) ? (int)$requestedGroup[0] : (int)($_GET['category_id'] ?? 0);
+            $gender = isset($requestedGroup[1]) ? $requestedGroup[1] : (string)($_GET['gender'] ?? '');
+            $selectedGroup = null;
+            foreach ($groups as $group) {
+                if ((int)$group['id'] === $categoryId && $group['gender'] === $gender) {
+                    $selectedGroup = $group;
+                    break;
+                }
+            }
+            if ($selectedGroup === null && $groups !== []) {
+                $selectedGroup = $groups[0];
+                $categoryId = (int)$selectedGroup['id'];
+                $gender = (string)$selectedGroup['gender'];
+            }
+
             $stmt = db()->prepare(
                 'SELECT p.*, c.name AS category_name, r.final_time_tenths, r.final_status
                  FROM participants p JOIN categories c ON c.id = p.category_id JOIN results r ON r.participant_id = p.id
-                 WHERE p.event_id = :event_id AND r.finalist_confirmed = 1
-                 ORDER BY c.sort_order, p.gender, p.last_name, p.first_name'
+                 WHERE p.event_id = :event_id AND p.category_id = :category_id
+                   AND p.gender = :gender AND r.finalist_confirmed = 1
+                 ORDER BY p.last_name, p.first_name'
             );
-            $stmt->execute(['event_id' => $event['id']]);
+            $rows = [];
+            if ($selectedGroup !== null) {
+                $stmt->execute(['event_id' => $event['id'], 'category_id' => $categoryId, 'gender' => $gender]);
+                $rows = $stmt->fetchAll();
+            }
             $mobileUrl = absoluteUrl('/mobile-final-results?event_id=' . (int)$event['id']);
             ?><section class="final-qr panel"><div><h2>Mobile Finalerfassung</h2><p>QR-Code mit dem Smartphone scannen und Finalzeiten direkt mobil erfassen.</p><a href="<?= e($mobileUrl) ?>"><?= e($mobileUrl) ?></a></div><a href="<?= e($mobileUrl) ?>"><img src="/mobile-final-results/qr?event_id=<?= (int)$event['id'] ?>" alt="QR-Code zur mobilen Finalerfassung" width="220" height="220"></a></section><?php
-            ?><form method="post" action="/final-results/save"><table><thead><tr><th>Gruppe</th><th>Name</th><th>Vorname</th><th>Finalzeit</th><th>Status</th></tr></thead><tbody><?php
-            foreach ($stmt as $row) {
+            ?>
+            <form method="get" action="/final-results" class="final-category-filter panel">
+                <label>Kategorie
+                    <select name="group" onchange="const [categoryId, gender] = this.value.split(':'); this.form.category_id.value = categoryId; this.form.gender.value = gender; this.form.submit()">
+                        <?php foreach ($groups as $group): ?>
+                            <?php $selected = (int)$group['id'] === $categoryId && $group['gender'] === $gender; ?>
+                            <option value="<?= (int)$group['id'] ?>:<?= e($group['gender']) ?>" <?= $selected ? 'selected' : '' ?>><?= e($group['name']) ?> · <?= $group['gender'] === 'female' ? 'Maedchen' : 'Knaben' ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <input type="hidden" name="category_id" value="<?= $categoryId ?>">
+                <input type="hidden" name="gender" value="<?= e($gender) ?>">
+                <noscript><button>Auswahl anzeigen</button></noscript>
+            </form>
+            <?php if ($groups === []): ?><div class="warning">Fuer diesen Anlass sind noch keine Finalisten bestaetigt.</div><?php else: ?>
+            <form method="post" action="/final-results/save">
+                <input type="hidden" name="category_id" value="<?= $categoryId ?>">
+                <input type="hidden" name="gender" value="<?= e($gender) ?>">
+                <table><thead><tr><th>Gruppe</th><th>Name</th><th>Vorname</th><th>Finalzeit</th><th>Status</th></tr></thead><tbody><?php
+            foreach ($rows as $row) {
                 ?><tr>
                     <td><?= e($row['category_name']) ?> <?= e($row['gender'] === 'female' ? 'Maedchen' : 'Knaben') ?></td>
                     <td><?= e($row['last_name']) ?></td>
@@ -1070,7 +1125,8 @@ try {
                     </select></td>
                 </tr><?php
             }
-            ?></tbody></table><div class="toolbar"><button>Finalzeiten speichern</button></div></form><?php
+            ?></tbody></table><div class="toolbar"><button>Finalzeiten speichern</button></div></form>
+            <?php endif; ?><?php
         });
         return;
     }

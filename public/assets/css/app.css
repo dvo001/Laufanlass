@@ -93,18 +93,15 @@ h3 { margin: 18px 0 8px; font-size: 17px; letter-spacing: 0; }
     width: auto;
 }
 
-.category-form {
-    display: grid;
-    grid-template-columns: minmax(120px, 1.4fr) 95px 95px 95px minmax(150px, 1fr) 110px auto;
-    margin-bottom: 8px;
+.category-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    white-space: nowrap;
 }
 
-.category-form select {
-    min-width: 110px;
-}
-
-.category-form span {
-    color: var(--muted);
+.category-actions form {
+    margin: 0;
 }
 
 .panel {

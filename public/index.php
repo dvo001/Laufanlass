@@ -686,9 +686,19 @@ try {
                 <label>Finallauf<select name="has_final"><option value="1">Ja</option><option value="0">Nein, Vorlauf werten</option></select></label>
                 <div><button>Gruppe speichern</button></div>
             </form></div>
-            <table><thead><tr><th>Name</th><th>Von</th><th>Bis</th><th>Sortierung</th><th>Wertungsgruppen</th><th>Aktiv</th><th>Finale</th><th>Aktion</th></tr></thead><tbody><?php
+            <table><thead><tr><th>Name</th><th>Jahrgang von</th><th>Jahrgang bis</th><th>Sortierung</th><th>Wertungsgruppen</th><th>Aktiv</th><th>Finallauf</th><th>Aktionen</th></tr></thead><tbody><?php
             foreach (categoriesForEvent((int)$event['id']) as $cat) {
-                echo '<tr><td colspan="8"><form class="inline-form category-form" method="post" action="/categories/update"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><input required name="name" value="' . e($cat['name']) . '"><input required type="number" name="year_from" value="' . (int)$cat['year_from'] . '"><input required type="number" name="year_to" value="' . (int)$cat['year_to'] . '"><input type="number" name="sort_order" value="' . (int)$cat['sort_order'] . '"><span>' . e($cat['name']) . ' Maedchen<br>' . e($cat['name']) . ' Knaben</span><select name="active"><option value="1"' . ((int)$cat['active'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['active'] ? '' : ' selected') . '>Nein</option></select><select name="has_final"><option value="1"' . ((int)$cat['has_final'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['has_final'] ? '' : ' selected') . '>Nein, Vorlauf</option></select><button>Speichern</button></form><form class="inline-form" method="post" action="/categories/delete" onsubmit="return confirm(\'Diese Jahrgangsgruppe wirklich loeschen? Zugeordnete Teilnehmende haben danach keine Kategorie mehr.\')"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><button class="danger">Loeschen</button></form></td></tr>';
+                $updateFormId = 'category-update-' . (int)$cat['id'];
+                echo '<tr>'
+                    . '<td><input required name="name" form="' . $updateFormId . '" value="' . e($cat['name']) . '"></td>'
+                    . '<td><input required type="number" name="year_from" form="' . $updateFormId . '" value="' . (int)$cat['year_from'] . '"></td>'
+                    . '<td><input required type="number" name="year_to" form="' . $updateFormId . '" value="' . (int)$cat['year_to'] . '"></td>'
+                    . '<td><input type="number" name="sort_order" form="' . $updateFormId . '" value="' . (int)$cat['sort_order'] . '"></td>'
+                    . '<td class="muted">' . e($cat['name']) . ' Maedchen<br>' . e($cat['name']) . ' Knaben</td>'
+                    . '<td><select name="active" form="' . $updateFormId . '"><option value="1"' . ((int)$cat['active'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['active'] ? '' : ' selected') . '>Nein</option></select></td>'
+                    . '<td><select name="has_final" form="' . $updateFormId . '"><option value="1"' . ((int)$cat['has_final'] ? ' selected' : '') . '>Ja</option><option value="0"' . ((int)$cat['has_final'] ? '' : ' selected') . '>Nein, Vorlauf werten</option></select></td>'
+                    . '<td><div class="category-actions"><form id="' . $updateFormId . '" method="post" action="/categories/update"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><button>Speichern</button></form><form method="post" action="/categories/delete" onsubmit="return confirm(\'Diese Jahrgangsgruppe wirklich loeschen? Zugeordnete Teilnehmende haben danach keine Kategorie mehr.\')"><input type="hidden" name="id" value="' . (int)$cat['id'] . '"><input type="hidden" name="event_id" value="' . (int)$event['id'] . '"><button class="danger">Loeschen</button></form></div></td>'
+                    . '</tr>';
             }
             ?></tbody></table><?php
         });

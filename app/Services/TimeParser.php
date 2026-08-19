@@ -15,7 +15,7 @@ final class TimeParser
         }
 
         if (str_starts_with($value, '-')) {
-            throw new InvalidArgumentException('Negative Zeiten sind ungueltig.');
+            throw new InvalidArgumentException('Negative Zeiten sind ungültig.');
         }
 
         if (preg_match('/^(\d{1,2}):([0-5]?\d)(?:[.,](\d))?$/', $value, $m)) {
@@ -30,7 +30,7 @@ final class TimeParser
             return (int)round(((float)$normalized) * 10);
         }
 
-        throw new InvalidArgumentException('Zeitformat ungueltig. Erlaubt sind z. B. 1:23.4, 1:23, 83.4 oder 83.');
+        throw new InvalidArgumentException('Zeitformat ungültig. Erlaubt sind z. B. 1:23.4, 1:23, 83.4 oder 83.');
     }
 
     public static function format(?int $tenths): string

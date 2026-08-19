@@ -31,7 +31,7 @@ final class FinalistService
             if ($third !== null) {
                 $tieRows = array_values(array_filter($rows, static fn (array $row): bool => (int)$row['best_qualification_time_tenths'] === (int)$third));
                 if (count($tieRows) > 1) {
-                    $warnings[$groupName] = 'Gleichstand auf dem dritten Qualifikationsrang pruefen.';
+                    $warnings[$groupName] = 'Gleichstand auf dem dritten Qualifikationsrang prüfen.';
                 }
             }
 
@@ -85,7 +85,7 @@ final class FinalistService
             $stmt->execute(['participant_id' => $participantId, 'event_id' => $eventId]);
             $group = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$group) {
-                throw new \InvalidArgumentException('Der abwesende Teilnehmer ist kein bestaetigter Finalist dieses Anlasses.');
+                throw new \InvalidArgumentException('Der abwesende Teilnehmer ist kein bestätigter Finalist dieses Anlasses.');
             }
 
             $this->pdo->prepare(
@@ -151,12 +151,12 @@ final class FinalistService
             $group = $row['category_id'] . ':' . $row['gender'];
             $counts[$group] = ($counts[$group] ?? 0) + 1;
             if ($counts[$group] > 3) {
-                throw new \InvalidArgumentException('Pro Kategorie und Geschlecht duerfen hoechstens drei Finalisten bestaetigt werden.');
+                throw new \InvalidArgumentException('Pro Kategorie und Geschlecht dürfen höchstens drei Finalisten bestätigt werden.');
             }
             $validIds[] = (int)$row['id'];
         }
         if (count($validIds) !== count($participantIds)) {
-            throw new \InvalidArgumentException('Mindestens eine Finalistenauswahl ist fuer diesen Anlass ungueltig.');
+            throw new \InvalidArgumentException('Mindestens eine Finalistenauswahl ist für diesen Anlass ungültig.');
         }
 
         $this->pdo->beginTransaction();

@@ -29,7 +29,7 @@ final class CategoryResolver
     {
         $errors = [];
         if ($yearFrom > $yearTo) {
-            $errors[] = 'Jahrgang von darf nicht groesser sein als Jahrgang bis.';
+            $errors[] = 'Jahrgang von darf nicht grösser sein als Jahrgang bis.';
         }
 
         $sql = 'SELECT * FROM categories
@@ -45,7 +45,7 @@ final class CategoryResolver
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $errors[] = sprintf('Ueberlappung mit %s (%d-%d).', $row['name'], $row['year_from'], $row['year_to']);
+            $errors[] = sprintf('Überlappung mit %s (%d-%d).', $row['name'], $row['year_from'], $row['year_to']);
         }
 
         return $errors;
@@ -65,7 +65,7 @@ final class CategoryResolver
             $current = $rows[$i];
             if ((int)$previous['year_to'] + 1 < (int)$current['year_from']) {
                 $warnings[] = sprintf(
-                    'Luecke zwischen %s und %s.',
+                    'Lücke zwischen %s und %s.',
                     $previous['name'],
                     $current['name']
                 );

@@ -105,7 +105,7 @@ final class RankingService
     {
         $groups = [];
         foreach ($rows as $row) {
-            $gender = $row['gender'] === 'female' ? 'Maedchen' : 'Knaben';
+            $gender = $row['gender'] === 'female' ? 'Mädchen' : 'Knaben';
             $groups[$row['category_name'] . ' ' . $gender][] = $row;
         }
 

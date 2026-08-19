@@ -72,7 +72,7 @@ SELECT
     ) AS category_id,
     LPAD(seed_rows.n, 3, '0') AS sheet_number,
     ELT(1 + MOD(FLOOR((seed_rows.n - 1) / 10), 10),
-        'Meier', 'Mueller', 'Schmid', 'Keller', 'Weber',
+        'Meier', 'Müller', 'Schmid', 'Keller', 'Weber',
         'Fischer', 'Huber', 'Steiner', 'Baumann', 'Gerber') AS last_name,
     IF(MOD(seed_rows.n, 2) = 0,
         ELT(1 + MOD(seed_rows.n - 1, 10),
@@ -86,8 +86,8 @@ SELECT
     IF(MOD(seed_rows.n, 2) = 0, 'male', 'female') AS gender,
     CONCAT('Klasse ', 1 + MOD(seed_rows.n - 1, 9), CHAR(97 + MOD(seed_rows.n - 1, 3))) AS school_class,
     ELT(1 + MOD(seed_rows.n - 1, 10),
-        'Winkel', 'Buelach', 'Kloten', 'Embrach', 'Bassersdorf',
-        'Oberglatt', 'Niederglatt', 'Dielsdorf', 'Ruemlang', 'Opfikon') AS city,
+        'Winkel', 'Bülach', 'Kloten', 'Embrach', 'Bassersdorf',
+        'Oberglatt', 'Niederglatt', 'Dielsdorf', 'Rümlang', 'Opfikon') AS city,
     'Teilnehmer-Seed' AS notes
 FROM (
     SELECT

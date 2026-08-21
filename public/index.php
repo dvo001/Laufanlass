@@ -131,7 +131,7 @@ function render(string $title, callable $content): void
         <div class="brand">Sportlauf</div>
         <nav class="nav">
             <?php foreach ($links as $href => $label): ?>
-                <a class="<?= $path === $href ? 'active' : '' ?>" href="<?= e($href) ?>"><?= e($label) ?></a>
+                <a class="<?= $path === $href ? 'active' : '' ?>" href="<?= e($href) ?>"<?= $href === '/sheets/pdf' ? ' target="_blank" rel="noopener"' : '' ?>><?= e($label) ?></a>
             <?php endforeach; ?>
         </nav>
     </aside>
@@ -1002,7 +1002,7 @@ try {
     }
 
     if ($path === '/mobile-final-results' && $method === 'GET') {
-        $events = db()->query('SELECT id, name, event_date FROM events ORDER BY event_date DESC, id DESC')->fetchAll();
+        $events = db()->query("SELECT id, name, event_date FROM events WHERE status = 'active' ORDER BY event_date DESC, id DESC")->fetchAll();
         $eventIds = array_map(static fn (array $event): int => (int)$event['id'], $events);
         $requestedEventId = (int)($_GET['event_id'] ?? 0);
         $activeEventId = (int)(activeEvent()['id'] ?? 0);

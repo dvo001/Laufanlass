@@ -310,7 +310,8 @@ function saveResult(int $participantId, array $data): void
 function renderRankingTable(array $rows, bool $final = false): void
 {
     if ($final) {
-        ?><table>
+        ?><div class="ranking-table-scroll"><table class="ranking-table ranking-table-final">
+            <colgroup><col style="width: 7%"><col style="width: 20%"><col style="width: 20%"><col style="width: 11%"><col style="width: 22%"><col style="width: 20%"></colgroup>
             <thead><tr>
                 <th>Rang</th><th>Name</th><th>Vorname</th><th>Jahrgang</th><th>Beste Qualifikationszeit</th><th><strong>Finalzeit</strong></th>
             </tr></thead>
@@ -327,7 +328,7 @@ function renderRankingTable(array $rows, bool $final = false): void
                 </tr>
             <?php endforeach; ?>
             </tbody>
-        </table><?php
+        </table></div><?php
         return;
     }
 
@@ -363,7 +364,8 @@ function renderDailyAwards(array $rows): void
         return;
     }
 
-    ?><table>
+    ?><div class="ranking-table-scroll"><table class="ranking-table ranking-table-awards">
+        <colgroup><col style="width: 7%"><col style="width: 20%"><col style="width: 20%"><col style="width: 11%"><col style="width: 22%"><col style="width: 10%"><col style="width: 10%"></colgroup>
         <thead><tr><th>Rang</th><th>Name</th><th>Vorname</th><th>Jahrgang</th><th>Kategorie</th><th>Zeit</th><th>Erzielt im</th></tr></thead>
         <tbody><?php foreach ($rows as $row): ?>
             <tr>
@@ -376,7 +378,7 @@ function renderDailyAwards(array $rows): void
                 <td><?= e($row['daily_time_source']) ?></td>
             </tr>
         <?php endforeach; ?></tbody>
-    </table><?php
+    </table></div><?php
 }
 
 function confirmedFinalistGroups(int $eventId): array

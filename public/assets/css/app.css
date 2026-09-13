@@ -208,6 +208,20 @@ th {
     color: #334155;
 }
 
+.ranking-table-scroll { width: 100%; overflow-x: auto; }
+.ranking-table { table-layout: fixed; }
+.ranking-table th, .ranking-table td { overflow-wrap: break-word; }
+.ranking-table tbody tr:nth-child(even) { background: #f8fafc; }
+.ranking-table td:first-child,
+.ranking-table td:nth-child(4),
+.ranking-table-final td:nth-child(n + 5),
+.ranking-table-awards td:nth-child(6) { font-variant-numeric: tabular-nums; }
+.ranking-table-final th:nth-child(n + 5),
+.ranking-table-final td:nth-child(n + 5),
+.ranking-table-awards th:nth-child(6),
+.ranking-table-awards td:nth-child(6) { text-align: right; }
+.ranking-table-final td:last-child { background: #eef2f7; }
+
 .flash, .warning, .error {
     border-radius: 8px;
     padding: 12px 14px;
@@ -410,6 +424,7 @@ th {
     .sidebar { position: static; }
     .main { padding: 18px; }
     table { display: block; overflow-x: auto; }
+    .ranking-table { display: table; min-width: 720px; }
     .final-qr { flex-direction: column; align-items: flex-start; }
     .mobile-final-page .sidebar { display: none; }
     .mobile-final-page .app { display: block; }
@@ -425,6 +440,8 @@ th {
         margin: 5mm 10mm 13mm;
     }
 
+    .ranking-table-scroll { overflow: visible; }
+    .ranking-table { display: table; min-width: 0; }
     body { background: #fff; }
     .sidebar, .toolbar, .no-print { display: none !important; }
     .app { display: block; }

@@ -457,13 +457,13 @@ CREATE TABLE IF NOT EXISTS participants (
 CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     participant_id INT NOT NULL,
-    run1_time_tenths INT NULL,
-    run2_time_tenths INT NULL,
-    best_qualification_time_tenths INT NULL,
+    run1_time_hundredths INT NULL,
+    run2_time_hundredths INT NULL,
+    best_qualification_time_hundredths INT NULL,
 
     is_finalist TINYINT(1) NOT NULL DEFAULT 0,
     finalist_confirmed TINYINT(1) NOT NULL DEFAULT 0,
-    final_time_tenths INT NULL,
+    final_time_hundredths INT NULL,
 
     qualification_status ENUM('no_time', 'valid', 'dns', 'dnf', 'dsq') NOT NULL DEFAULT 'no_time',
     final_status ENUM('not_qualified', 'qualified', 'valid', 'dns', 'dnf', 'dsq') NOT NULL DEFAULT 'not_qualified',
@@ -478,8 +478,8 @@ CREATE TABLE IF NOT EXISTS results (
         ON DELETE CASCADE,
 
     UNIQUE KEY uq_results_participant (participant_id),
-    INDEX idx_results_qualification_time (best_qualification_time_tenths),
-    INDEX idx_results_final_time (final_time_tenths),
+    INDEX idx_results_qualification_time (best_qualification_time_hundredths),
+    INDEX idx_results_final_time (final_time_hundredths),
     INDEX idx_results_finalist (is_finalist),
     INDEX idx_results_finalist_confirmed (finalist_confirmed)
 );

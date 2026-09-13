@@ -173,8 +173,8 @@ JOIN participants p ON p.id = r.participant_id
 JOIN (
     SELECT
         numbers.n,
-        120 + MOD(numbers.n * 17 + 23, 121) AS run1_time_tenths,
-        120 + MOD(numbers.n * 19 + 41, 121) AS run2_time_tenths
+        1200 + MOD(numbers.n * 17 + 23, 1201) AS run1_time_hundredths,
+        1200 + MOD(numbers.n * 19 + 41, 1201) AS run2_time_hundredths
     FROM (
         SELECT ones.i + tens.i * 10 + 1 AS n
         FROM (
@@ -188,9 +188,9 @@ JOIN (
     ) AS numbers
     WHERE numbers.n <= 100
 ) AS seed_times ON seed_times.n = CAST(p.sheet_number AS UNSIGNED)
-SET r.run1_time_tenths = seed_times.run1_time_tenths,
-    r.run2_time_tenths = seed_times.run2_time_tenths,
-    r.best_qualification_time_tenths = LEAST(seed_times.run1_time_tenths, seed_times.run2_time_tenths),
+SET r.run1_time_hundredths = seed_times.run1_time_hundredths,
+    r.run2_time_hundredths = seed_times.run2_time_hundredths,
+    r.best_qualification_time_hundredths = LEAST(seed_times.run1_time_hundredths, seed_times.run2_time_hundredths),
     r.qualification_status = 'valid'
 WHERE p.event_id = @event_id
   AND p.notes = 'Teilnehmer-Seed';

@@ -288,12 +288,12 @@ function saveResult(int $participantId, array $data): void
     }
 
     $stmt = db()->prepare(
-        'INSERT INTO results (participant_id, run1_time_tenths, run2_time_tenths, best_qualification_time_tenths, qualification_status, notes)
+        'INSERT INTO results (participant_id, run1_time_hundredths, run2_time_hundredths, best_qualification_time_hundredths, qualification_status, notes)
          VALUES (:participant_id, :run1, :run2, :best, :status, :notes)
          ON DUPLICATE KEY UPDATE
-           run1_time_tenths = VALUES(run1_time_tenths),
-           run2_time_tenths = VALUES(run2_time_tenths),
-           best_qualification_time_tenths = VALUES(best_qualification_time_tenths),
+           run1_time_hundredths = VALUES(run1_time_hundredths),
+           run2_time_hundredths = VALUES(run2_time_hundredths),
+           best_qualification_time_hundredths = VALUES(best_qualification_time_hundredths),
            qualification_status = VALUES(qualification_status),
            notes = VALUES(notes)'
     );
@@ -316,13 +316,13 @@ function renderRankingTable(array $rows, bool $final = false): void
             </tr></thead>
             <tbody>
             <?php foreach ($rows as $row): ?>
-                <?php $finalValue = $row['final_time_tenths'] !== null ? TimeParser::format((int)$row['final_time_tenths']) : strtoupper((string)$row['final_status']); ?>
+                <?php $finalValue = $row['final_time_hundredths'] !== null ? TimeParser::format((int)$row['final_time_hundredths']) : strtoupper((string)$row['final_status']); ?>
                 <tr>
                     <td><?= (int)$row['rank'] ?></td>
                     <td><?= e($row['last_name']) ?></td>
                     <td><?= e($row['first_name']) ?></td>
                     <td><?= e((string)$row['birth_year']) ?></td>
-                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
+                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_hundredths'])) ?></td>
                     <td><strong><?= e($finalValue) ?></strong></td>
                 </tr>
             <?php endforeach; ?>
@@ -334,7 +334,7 @@ function renderRankingTable(array $rows, bool $final = false): void
     ?><table>
         <thead><tr>
             <th>Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th>
-            <th>Lauf 1</th><th>Lauf 2</th><th>Quali</th><th>Finale</th><th>Status</th>
+            <th>Lauf 1</th><th>Lauf 2</th><th>Quali</th><th>Finale</th><th>Status</th><th>Zeitkommentar</th>
         </tr></thead>
         <tbody>
         <?php foreach ($rows as $row): ?>
@@ -343,11 +343,12 @@ function renderRankingTable(array $rows, bool $final = false): void
                 <td><?= e($row['last_name']) ?></td>
                 <td><?= e($row['first_name']) ?></td>
                 <td><?= e((string)$row['birth_year']) ?></td>
-                <td><?= e(TimeParser::format($row['run1_time_tenths'] !== null ? (int)$row['run1_time_tenths'] : null)) ?></td>
-                <td><?= e(TimeParser::format($row['run2_time_tenths'] !== null ? (int)$row['run2_time_tenths'] : null)) ?></td>
-                <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
-                <td><?= e(TimeParser::format($row['final_time_tenths'] !== null ? (int)$row['final_time_tenths'] : null)) ?></td>
+                <td><?= e(TimeParser::format($row['run1_time_hundredths'] !== null ? (int)$row['run1_time_hundredths'] : null)) ?></td>
+                <td><?= e(TimeParser::format($row['run2_time_hundredths'] !== null ? (int)$row['run2_time_hundredths'] : null)) ?></td>
+                <td><?= e(TimeParser::format((int)$row['best_qualification_time_hundredths'])) ?></td>
+                <td><?= e(TimeParser::format($row['final_time_hundredths'] !== null ? (int)$row['final_time_hundredths'] : null)) ?></td>
                 <td><?= e($final ? ($row['ranking_segment'] ?? $row['final_status']) : $row['qualification_status']) ?></td>
+                <td><?= nl2br(e($row['result_notes'] ?? '')) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
@@ -371,7 +372,7 @@ function renderDailyAwards(array $rows): void
                 <td><?= e($row['first_name']) ?></td>
                 <td><?= (int)$row['birth_year'] ?></td>
                 <td><?= e($row['category_name']) ?> <?= $row['gender'] === 'female' ? 'Mädchen' : 'Knaben' ?></td>
-                <td><strong><?= e(TimeParser::format((int)$row['daily_time_tenths'])) ?></strong></td>
+                <td><strong><?= e(TimeParser::format((int)$row['daily_time_hundredths'])) ?></strong></td>
                 <td><?= e($row['daily_time_source']) ?></td>
             </tr>
         <?php endforeach; ?></tbody>
@@ -381,13 +382,13 @@ function renderDailyAwards(array $rows): void
 function confirmedFinalistGroups(int $eventId): array
 {
     $stmt = db()->prepare(
-        'SELECT p.*, c.name AS category_name, c.sort_order, r.best_qualification_time_tenths
+        'SELECT p.*, c.name AS category_name, c.sort_order, r.best_qualification_time_hundredths
          FROM participants p
          JOIN categories c ON c.id = p.category_id
          JOIN results r ON r.participant_id = p.id
          WHERE p.event_id = :event_id
            AND r.finalist_confirmed = 1
-         ORDER BY c.sort_order, c.year_from DESC, p.gender, r.best_qualification_time_tenths, p.last_name, p.first_name'
+         ORDER BY c.sort_order, c.year_from DESC, p.gender, r.best_qualification_time_hundredths, p.last_name, p.first_name'
     );
     $stmt->execute(['event_id' => $eventId]);
 
@@ -422,7 +423,7 @@ function renderConfirmedFinalists(array $groups): void
                     <td><?= e($row['last_name']) ?></td>
                     <td><?= e($row['first_name']) ?></td>
                     <td><?= (int)$row['birth_year'] ?></td>
-                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
+                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_hundredths'])) ?></td>
                 </tr><?php
             }
             ?></tbody>
@@ -441,7 +442,7 @@ function renderFullFinalistList(array $groups): void
         echo '<h2>' . e($group) . '</h2>';
         ?><table>
             <thead><tr>
-                <th>Quali-Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Status</th><th>Laufzettel</th><th>Qualizeit</th>
+                <th>Quali-Rang</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Status</th><th>Laufzettel</th><th>Qualizeit</th><th>Zeitkommentar</th>
             </tr></thead>
             <tbody><?php
             foreach ($data['candidates'] as $row) {
@@ -457,7 +458,8 @@ function renderFullFinalistList(array $groups): void
                     <td><?= (int)$row['birth_year'] ?></td>
                     <td><?= e($status) ?></td>
                     <td><?= e($row['sheet_number']) ?></td>
-                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_tenths'])) ?></td>
+                    <td><?= e(TimeParser::format((int)$row['best_qualification_time_hundredths'])) ?></td>
+                    <td><?= nl2br(e($row['result_notes'] ?? '')) ?></td>
                 </tr><?php
             }
             ?></tbody>
@@ -537,11 +539,11 @@ try {
             $metrics = [
                 'Personen' => 'SELECT COUNT(*) FROM participants WHERE event_id = ?',
                 'Mit gültiger Zeit' => 'SELECT COUNT(*) FROM participants p JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND r.qualification_status = "valid"',
-                'Ohne Zeit' => 'SELECT COUNT(*) FROM participants p LEFT JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND (r.best_qualification_time_tenths IS NULL OR r.id IS NULL)',
+                'Ohne Zeit' => 'SELECT COUNT(*) FROM participants p LEFT JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND (r.best_qualification_time_hundredths IS NULL OR r.id IS NULL)',
                 'Ohne Kategorie' => 'SELECT COUNT(*) FROM participants WHERE event_id = ? AND category_id IS NULL',
                 'Vorgeschlagene Finalisten' => 'SELECT COUNT(*) FROM participants p JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND r.is_finalist = 1',
                 'Bestätigte Finalisten' => 'SELECT COUNT(*) FROM participants p JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND r.finalist_confirmed = 1',
-                'Finalisten ohne Finalzeit' => 'SELECT COUNT(*) FROM participants p JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND r.finalist_confirmed = 1 AND r.final_time_tenths IS NULL AND r.final_status = "qualified"',
+                'Finalisten ohne Finalzeit' => 'SELECT COUNT(*) FROM participants p JOIN results r ON r.participant_id = p.id WHERE p.event_id = ? AND r.finalist_confirmed = 1 AND r.final_time_hundredths IS NULL AND r.final_status = "qualified"',
             ];
             ?><div class="panel">
                 <h2><?= e($event['name']) ?></h2>
@@ -755,18 +757,96 @@ try {
         return;
     }
 
+    if ($path === '/participants/edit' && in_array($method, ['GET', 'POST'], true)) {
+        $event = requireEvent();
+        $request = $method === 'POST' ? $_POST : $_GET;
+        $participantId = (int)($request['id'] ?? 0);
+        $search = trim((string)($request['q'] ?? ''));
+        $listUrl = '/participants' . ($search !== '' ? '?' . http_build_query(['q' => $search]) : '');
+        $stmt = db()->prepare('SELECT * FROM participants WHERE id = :id AND event_id = :event_id');
+        $stmt->execute(['id' => $participantId, 'event_id' => $event['id']]);
+        $participant = $stmt->fetch();
+        if (!$participant) {
+            throw new InvalidArgumentException('Teilnehmer für diesen Anlass nicht gefunden.');
+        }
+        $errors = [];
+        if ($method === 'POST') {
+            $participant['first_name'] = trim((string)($_POST['first_name'] ?? ''));
+            $participant['last_name'] = trim((string)($_POST['last_name'] ?? ''));
+            $participant['birth_year'] = trim((string)($_POST['birth_year'] ?? ''));
+            foreach (['first_name' => 'Vorname', 'last_name' => 'Nachname'] as $field => $label) {
+                $length = preg_match_all('/./us', $participant[$field]);
+                if ($length === false || $length < 1 || $length > 100) {
+                    $errors[] = $label . ' muss zwischen 1 und 100 Zeichen enthalten.';
+                }
+            }
+            if (!preg_match('/^\d{4}$/', $participant['birth_year']) || (int)$participant['birth_year'] < 1900 || (int)$participant['birth_year'] > 2100) {
+                $errors[] = 'Jahrgang muss vierstellig sein und zwischen 1900 und 2100 liegen.';
+            }
+            if ($errors === []) {
+                $category = (new CategoryResolver(db()))->resolve((int)$event['id'], (int)$participant['birth_year']);
+                $stmt = db()->prepare(
+                    'UPDATE participants SET first_name = :first_name, last_name = :last_name,
+                     birth_year = :birth_year, category_id = :category_id
+                     WHERE id = :id AND event_id = :event_id'
+                );
+                $stmt->execute([
+                    'first_name' => $participant['first_name'],
+                    'last_name' => $participant['last_name'],
+                    'birth_year' => (int)$participant['birth_year'],
+                    'category_id' => $category['id'] ?? null,
+                    'id' => $participantId,
+                    'event_id' => $event['id'],
+                ]);
+                redirect($listUrl, 'Teilnehmer aktualisiert.' . ($category === null ? ' Für diesen Jahrgang ist keine aktive Kategorie vorhanden.' : ''));
+            }
+            http_response_code(422);
+        }
+        render('Teilnehmer bearbeiten', function () use ($participant, $errors, $search, $listUrl): void {
+            foreach ($errors as $error) {
+                echo '<div class="warning">' . e($error) . '</div>';
+            }
+            ?><p>Laufzettel: <?= e($participant['sheet_number']) ?></p>
+            <div class="panel"><form method="post" action="/participants/edit" class="grid">
+                <input type="hidden" name="id" value="<?= (int)$participant['id'] ?>">
+                <input type="hidden" name="q" value="<?= e($search) ?>">
+                <label>Vorname<input required maxlength="100" name="first_name" value="<?= e($participant['first_name']) ?>" autofocus></label>
+                <label>Nachname<input required maxlength="100" name="last_name" value="<?= e($participant['last_name']) ?>"></label>
+                <label>Jahrgang<input required type="number" min="1900" max="2100" step="1" name="birth_year" value="<?= e((string)$participant['birth_year']) ?>"></label>
+                <p class="muted">Die Kategorie wird anhand des Jahrgangs automatisch zugeordnet.</p>
+                <div class="toolbar"><button>Speichern</button><a class="button light" href="<?= e($listUrl) ?>">Abbrechen</a></div>
+            </form></div><?php
+        });
+        return;
+    }
+
     if ($path === '/participants' && $method === 'GET') {
         render('Teilnehmer', function (): void {
             $event = requireEvent();
+            $search = trim((string)($_GET['q'] ?? ''));
             ?><div class="toolbar"><a class="button" href="/participants/create">Teilnehmer erfassen</a></div>
+            <form method="get" action="/participants" class="toolbar">
+                <label>Vor- oder Nachname<input type="search" name="q" value="<?= e($search) ?>" placeholder="Name oder Namensteile"></label>
+                <button>Suchen</button><a class="button light" href="/participants">Zurücksetzen</a>
+            </form>
             <table><thead><tr><th>Zettel</th><th>Name</th><th>Vorname</th><th>Jg.</th><th>Geschlecht</th><th>Kategorie</th><th>Aktionen</th></tr></thead><tbody><?php
-            $stmt = db()->prepare(
-                'SELECT p.*, c.name AS category_name FROM participants p LEFT JOIN categories c ON c.id = p.category_id
-                 WHERE p.event_id = :event_id ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number'
-            );
-            $stmt->execute(['event_id' => $event['id']]);
-            foreach ($stmt as $p) {
-                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td><td><form method="post" action="/participants/delete" onsubmit="return confirm(\'Diesen Teilnehmer wirklich löschen? Zugehörige Zeiten werden ebenfalls gelöscht.\')"><input type="hidden" name="id" value="' . (int)$p['id'] . '"><button class="danger" type="submit">Löschen</button></form></td></tr>';
+            $sql = 'SELECT p.*, c.name AS category_name FROM participants p LEFT JOIN categories c ON c.id = p.category_id
+                    WHERE p.event_id = :event_id';
+            $params = ['event_id' => $event['id']];
+            foreach (preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $index => $term) {
+                $sql .= " AND (LOCATE(:first_{$index}, p.first_name) > 0 OR LOCATE(:last_{$index}, p.last_name) > 0)";
+                $params['first_' . $index] = $term;
+                $params['last_' . $index] = $term;
+            }
+            $sql .= ' ORDER BY CAST(p.sheet_number AS UNSIGNED), p.sheet_number';
+            $stmt = db()->prepare($sql);
+            $stmt->execute($params);
+            $participants = $stmt->fetchAll();
+            if ($participants === []) {
+                echo '<tr><td colspan="7">Keine Teilnehmer gefunden.</td></tr>';
+            }
+            foreach ($participants as $p) {
+                echo '<tr><td>' . e($p['sheet_number']) . '</td><td>' . e($p['last_name']) . '</td><td>' . e($p['first_name']) . '</td><td>' . (int)$p['birth_year'] . '</td><td>' . e($p['gender'] === 'female' ? 'Mädchen' : 'Knabe') . '</td><td>' . e($p['category_name'] ?: 'ohne Kategorie') . '</td><td><div class="category-actions"><a class="button light" href="' . e('/participants/edit?' . http_build_query(['id' => (int)$p['id'], 'q' => $search])) . '">Bearbeiten</a><form method="post" action="/participants/delete" onsubmit="return confirm(\'Diesen Teilnehmer wirklich löschen? Zugehörige Zeiten werden ebenfalls gelöscht.\')"><input type="hidden" name="id" value="' . (int)$p['id'] . '"><button class="danger" type="submit">Löschen</button></form></div></td></tr>';
             }
             ?></tbody></table><?php
         });
@@ -799,8 +879,8 @@ try {
             $participant = null;
             if ($sheetNumber !== '' && ctype_digit($sheetNumber)) {
                 $stmt = db()->prepare(
-                    'SELECT p.*, c.name AS category_name, r.run1_time_tenths, r.run2_time_tenths,
-                            r.best_qualification_time_tenths, r.qualification_status, r.notes AS result_notes
+                    'SELECT p.*, c.name AS category_name, r.run1_time_hundredths, r.run2_time_hundredths,
+                            r.best_qualification_time_hundredths, r.qualification_status, r.notes AS result_notes
                      FROM participants p
                      LEFT JOIN categories c ON c.id = p.category_id
                      LEFT JOIN results r ON r.participant_id = p.id
@@ -818,11 +898,11 @@ try {
                 $p = $participant;
                 ?><div class="panel">
                     <h2><?= e($p['sheet_number']) ?> · <?= e($p['last_name']) ?> <?= e($p['first_name']) ?></h2>
-                    <p class="muted"><?= e($p['category_name'] ?: 'ohne Kategorie') ?> · Beste Zeit: <?= e(TimeParser::format($p['best_qualification_time_tenths'] !== null ? (int)$p['best_qualification_time_tenths'] : null)) ?></p>
+                    <p class="muted"><?= e($p['category_name'] ?: 'ohne Kategorie') ?> · Beste Zeit: <?= e(TimeParser::format($p['best_qualification_time_hundredths'] !== null ? (int)$p['best_qualification_time_hundredths'] : null)) ?></p>
                     <form method="post" action="/results/save" class="grid">
                         <input type="hidden" name="participant_id" value="<?= (int)$p['id'] ?>">
-                        <label>Lauf 1<input name="run1_time" value="<?= e(TimeParser::format($p['run1_time_tenths'] !== null ? (int)$p['run1_time_tenths'] : null)) ?>"></label>
-                        <label>Lauf 2<input name="run2_time" value="<?= e(TimeParser::format($p['run2_time_tenths'] !== null ? (int)$p['run2_time_tenths'] : null)) ?>"></label>
+                        <label>Lauf 1<input name="run1_time" value="<?= e(TimeParser::format($p['run1_time_hundredths'] !== null ? (int)$p['run1_time_hundredths'] : null)) ?>"></label>
+                        <label>Lauf 2<input name="run2_time" value="<?= e(TimeParser::format($p['run2_time_hundredths'] !== null ? (int)$p['run2_time_hundredths'] : null)) ?>"></label>
                         <label>Status<select name="qualification_status">
                             <?php foreach (['no_time', 'valid', 'dns', 'dnf', 'dsq'] as $status): ?>
                                 <option value="<?= e($status) ?>" <?= $p['qualification_status'] === $status ? 'selected' : '' ?>><?= e($status) ?></option>
@@ -853,8 +933,8 @@ try {
                 <label>Vorname<input required name="first_name"></label>
                 <label>Jahrgang<input required type="number" name="birth_year"></label>
                 <label>Geschlecht<select name="gender"><option value="female">Mädchen</option><option value="male">Knabe</option></select></label>
-                <label>Lauf 1<input name="run1_time" placeholder="1:23.4"></label>
-                <label>Lauf 2<input name="run2_time" placeholder="83.4"></label>
+                <label>Lauf 1<input name="run1_time" placeholder="1:23.45"></label>
+                <label>Lauf 2<input name="run2_time" placeholder="83.45"></label>
                 <div><button>Speichern und nächster Zettel</button></div>
             </form></div><?php
         });
@@ -887,18 +967,19 @@ try {
             ?><div class="toolbar">
                 <a class="button light" href="/finalists/pdf">Finalisten inkl. Nachrücker drucken/PDF</a>
             </div><?php
-            ?><form method="post" action="/finalists/confirm"><?php
+            ?><p class="muted">Beim ersten Öffnen sind die drei Schnellsten vorausgewählt. Du kannst beliebig viele Finalisten auswählen, auch bei Zeitgleichheit. Alle angekreuzten Teilnehmenden werden übernommen.</p>
+            <form method="post" action="/finalists/confirm"><?php
             foreach ($proposal['groups'] as $group => $data) {
                 echo '<h2>' . e($group) . '</h2>';
                 if ($data['warning']) {
                     echo '<div class="warning">' . e($data['warning']) . '</div>';
                 }
-                echo '<table><thead><tr><th>Bestätigen</th><th>Name</th><th>Vorname</th><th>Qualizeit</th><th>Hinweis</th></tr></thead><tbody>';
+                echo '<table><thead><tr><th>Bestätigen</th><th>Name</th><th>Vorname</th><th>Qualizeit</th><th>Zeitkommentar</th><th>Hinweis</th></tr></thead><tbody>';
                 foreach ($data['candidates'] as $index => $row) {
                     $tie = in_array($row, $data['tie_rows'], true) && count($data['tie_rows']) > 1;
                     $hint = $tie ? 'Gleichstand prüfen' : ($index >= 3 ? 'Nachrücker Rang ' . ($index + 1) : 'Direkt qualifiziert');
                     $checked = in_array((int)$row['id'], $data['selected_ids'], true);
-                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '"' . ($checked ? ' checked' : '') . '></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_tenths'])) . '</td><td>' . e($hint) . '</td></tr>';
+                    echo '<tr><td><input type="checkbox" name="participant_ids[]" value="' . (int)$row['id'] . '"' . ($checked ? ' checked' : '') . '></td><td>' . e($row['last_name']) . '</td><td>' . e($row['first_name']) . '</td><td>' . e(TimeParser::format((int)$row['best_qualification_time_hundredths'])) . '</td><td>' . nl2br(e($row['result_notes'] ?? '')) . '</td><td>' . e($hint) . '</td></tr>';
                 }
                 echo '</tbody></table>';
             }
@@ -933,7 +1014,7 @@ try {
                 $finalistService->markAbsentAndPromote((int)$event['id'], (int)$participantId);
                 continue;
             }
-            $stmt = db()->prepare('UPDATE results SET final_time_tenths = :time, final_status = :status WHERE participant_id = :id');
+            $stmt = db()->prepare('UPDATE results SET final_time_hundredths = :time, final_status = :status WHERE participant_id = :id');
             $stmt->execute(['time' => $time, 'status' => $status, 'id' => (int)$participantId]);
         }
         $query = $categoryId > 0 && in_array($gender, ['female', 'male'], true)
@@ -963,7 +1044,7 @@ try {
         } else {
             $stmt = db()->prepare(
             'UPDATE results r JOIN participants p ON p.id = r.participant_id
-             SET r.final_time_tenths = :time, r.final_status = :status
+             SET r.final_time_hundredths = :time, r.final_status = :status
              WHERE r.participant_id = :participant_id AND r.finalist_confirmed = 1
                AND p.event_id = :event_id AND p.category_id = :category_id AND p.gender = :gender'
         );
@@ -1043,11 +1124,11 @@ try {
         if ($selectedGroup !== null) {
             $stmt = db()->prepare(
                 'SELECT p.id, p.last_name, p.first_name, p.birth_year,
-                        r.best_qualification_time_tenths, r.final_time_tenths, r.final_status
+                        r.best_qualification_time_hundredths, r.final_time_hundredths, r.final_status
                  FROM participants p JOIN results r ON r.participant_id = p.id
                  WHERE p.event_id = :event_id AND p.category_id = :category_id
                    AND p.gender = :gender AND r.finalist_confirmed = 1
-                 ORDER BY r.best_qualification_time_tenths, p.last_name, p.first_name'
+                 ORDER BY r.best_qualification_time_hundredths, p.last_name, p.first_name'
             );
             $stmt->execute(['event_id' => $eventId, 'category_id' => $categoryId, 'gender' => $gender]);
             $finalists = $stmt->fetchAll();
@@ -1075,8 +1156,8 @@ try {
                         <?php foreach ($finalists as $runner): ?>
                             <form method="post" action="/mobile-final-results/save" class="mobile-final-runner panel">
                                 <input type="hidden" name="event_id" value="<?= $eventId ?>"><input type="hidden" name="category_id" value="<?= $categoryId ?>"><input type="hidden" name="gender" value="<?= e($gender) ?>"><input type="hidden" name="participant_id" value="<?= (int)$runner['id'] ?>">
-                                <div class="mobile-final-runner-name"><strong><?= e($runner['last_name']) ?> <?= e($runner['first_name']) ?></strong><span>Jg. <?= (int)$runner['birth_year'] ?> · Quali <?= e(TimeParser::format((int)$runner['best_qualification_time_tenths'])) ?></span></div>
-                                <label>Finalzeit<input name="time" inputmode="decimal" autocomplete="off" placeholder="z. B. 83.4" value="<?= e(TimeParser::format($runner['final_time_tenths'] !== null ? (int)$runner['final_time_tenths'] : null)) ?>"></label>
+                                <div class="mobile-final-runner-name"><strong><?= e($runner['last_name']) ?> <?= e($runner['first_name']) ?></strong><span>Jg. <?= (int)$runner['birth_year'] ?> · Quali <?= e(TimeParser::format((int)$runner['best_qualification_time_hundredths'])) ?></span></div>
+                                <label>Finalzeit<input name="time" inputmode="decimal" autocomplete="off" placeholder="z. B. 83.45" value="<?= e(TimeParser::format($runner['final_time_hundredths'] !== null ? (int)$runner['final_time_hundredths'] : null)) ?>"></label>
                                 <div class="mobile-final-actions"><button type="submit" name="action" value="save">Zeit speichern</button><button type="submit" name="action" value="present_no_run">Am Start, nicht gelaufen</button><button type="submit" name="action" value="absent" class="danger">Nicht erschienen</button></div>
                                 <?php if ($runner['final_status'] === 'present_no_run'): ?><div class="bad">Automatisch Rang 3</div><?php elseif ($runner['final_status'] === 'absent'): ?><div class="bad">Nicht erschienen: Platzverlust</div><?php endif; ?>
                             </form>
@@ -1119,7 +1200,7 @@ try {
             }
 
             $stmt = db()->prepare(
-                'SELECT p.*, c.name AS category_name, r.final_time_tenths, r.final_status
+                'SELECT p.*, c.name AS category_name, r.final_time_hundredths, r.final_status
                  FROM participants p JOIN categories c ON c.id = p.category_id JOIN results r ON r.participant_id = p.id
                  WHERE p.event_id = :event_id AND p.category_id = :category_id
                    AND p.gender = :gender AND r.finalist_confirmed = 1
@@ -1156,7 +1237,7 @@ try {
                     <td><?= e($row['category_name']) ?> <?= e($row['gender'] === 'female' ? 'Mädchen' : 'Knaben') ?></td>
                     <td><?= e($row['last_name']) ?></td>
                     <td><?= e($row['first_name']) ?></td>
-                    <td><input name="final[<?= (int)$row['id'] ?>][time]" value="<?= e(TimeParser::format($row['final_time_tenths'] !== null ? (int)$row['final_time_tenths'] : null)) ?>"></td>
+                    <td><input name="final[<?= (int)$row['id'] ?>][time]" value="<?= e(TimeParser::format($row['final_time_hundredths'] !== null ? (int)$row['final_time_hundredths'] : null)) ?>"></td>
                     <td><select name="final[<?= (int)$row['id'] ?>][status]">
                         <?php foreach (['qualified' => 'qualifiziert', 'valid' => 'gelaufen', 'present_no_run' => 'am Start, nicht gelaufen (Rang 3)', 'absent' => 'nicht erschienen (Platzverlust)', 'dnf' => 'nicht im Ziel', 'dsq' => 'disqualifiziert'] as $status => $label): ?>
                             <option value="<?= e($status) ?>" <?= $row['final_status'] === $status ? 'selected' : '' ?>><?= e($label) ?></option>
@@ -1233,11 +1314,11 @@ try {
                 fputcsv($out, [
                     $row['rank'], $row['last_name'], $row['first_name'], $row['birth_year'],
                     $row['gender'] === 'female' ? 'Mädchen' : 'Knabe', $row['category_name'],
-                    TimeParser::format($row['run1_time_tenths'] !== null ? (int)$row['run1_time_tenths'] : null),
-                    TimeParser::format($row['run2_time_tenths'] !== null ? (int)$row['run2_time_tenths'] : null),
-                    TimeParser::format((int)$row['best_qualification_time_tenths']),
+                    TimeParser::format($row['run1_time_hundredths'] !== null ? (int)$row['run1_time_hundredths'] : null),
+                    TimeParser::format($row['run2_time_hundredths'] !== null ? (int)$row['run2_time_hundredths'] : null),
+                    TimeParser::format((int)$row['best_qualification_time_hundredths']),
                     (int)$row['finalist_confirmed'] === 1 ? 'ja' : 'nein',
-                    TimeParser::format($row['final_time_tenths'] !== null ? (int)$row['final_time_tenths'] : null),
+                    TimeParser::format($row['final_time_hundredths'] !== null ? (int)$row['final_time_hundredths'] : null),
                     $row['ranking_segment'] ?? $row['qualification_status'],
                 ], ';');
             }

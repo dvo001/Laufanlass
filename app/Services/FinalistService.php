@@ -26,10 +26,10 @@ final class FinalistService
                 static fn (array $row): bool => $row['final_status'] !== 'absent'
             ));
             $top = array_slice($rows, 0, 3);
-            $third = $top[2]['best_qualification_time_tenths'] ?? null;
+            $third = $top[2]['best_qualification_time_hundredths'] ?? null;
             $tieRows = [];
             if ($third !== null) {
-                $tieRows = array_values(array_filter($rows, static fn (array $row): bool => (int)$row['best_qualification_time_tenths'] === (int)$third));
+                $tieRows = array_values(array_filter($rows, static fn (array $row): bool => (int)$row['best_qualification_time_hundredths'] === (int)$third));
                 if (count($tieRows) > 1) {
                     $warnings[$groupName] = 'Gleichstand auf dem dritten Qualifikationsrang prüfen.';
                 }
@@ -73,7 +73,7 @@ final class FinalistService
             'UPDATE results r
              JOIN participants p ON p.id = r.participant_id
              SET r.is_finalist = 0, r.finalist_confirmed = 0,
-                 r.final_time_tenths = NULL, r.final_status = "not_qualified"
+                 r.final_time_hundredths = NULL, r.final_status = "not_qualified"
              WHERE p.event_id = :event_id'
         )->execute(['event_id' => $eventId]);
 
@@ -112,7 +112,7 @@ final class FinalistService
             $this->pdo->prepare(
                 "UPDATE results
                  SET finalist_confirmed = 0, is_finalist = 0,
-                     final_time_tenths = NULL, final_status = 'absent'
+                     final_time_hundredths = NULL, final_status = 'absent'
                  WHERE participant_id = :participant_id"
             )->execute(['participant_id' => $participantId]);
 
@@ -122,7 +122,7 @@ final class FinalistService
                  WHERE p.event_id = :event_id AND p.category_id = :category_id
                    AND p.gender = :gender AND r.finalist_confirmed = 0
                    AND r.qualification_status = 'valid' AND r.final_status <> 'absent'
-                 ORDER BY r.best_qualification_time_tenths, p.last_name, p.first_name
+                 ORDER BY r.best_qualification_time_hundredths, p.last_name, p.first_name
                  LIMIT 1 FOR UPDATE"
             );
             $replacement->execute([
@@ -157,23 +157,17 @@ final class FinalistService
 
         $placeholders = implode(',', array_fill(0, count($participantIds), '?'));
         $validation = $this->pdo->prepare(
-            "SELECT p.id, p.category_id, p.gender
+            "SELECT p.id
              FROM participants p
              JOIN categories c ON c.id = p.category_id AND c.has_final = 1
              JOIN results r ON r.participant_id = p.id
              WHERE p.event_id = ? AND p.id IN ($placeholders)
                AND r.qualification_status = 'valid'
-             ORDER BY r.best_qualification_time_tenths, p.last_name, p.first_name"
+             ORDER BY r.best_qualification_time_hundredths, p.last_name, p.first_name"
         );
         $validation->execute(array_merge([$eventId], $participantIds));
         $validIds = [];
-        $counts = [];
         foreach ($validation->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $group = $row['category_id'] . ':' . $row['gender'];
-            $counts[$group] = ($counts[$group] ?? 0) + 1;
-            if ($counts[$group] > 3) {
-                throw new \InvalidArgumentException('Pro Kategorie und Geschlecht dürfen höchstens drei Finalisten bestätigt werden.');
-            }
             $validIds[] = (int)$row['id'];
         }
         if (count($validIds) !== count($participantIds)) {
@@ -187,7 +181,7 @@ final class FinalistService
             $this->pdo->prepare(
                 "UPDATE results r JOIN participants p ON p.id = r.participant_id
                  SET r.finalist_confirmed = 0, r.is_finalist = 0,
-                     r.final_time_tenths = NULL, r.final_status = 'not_qualified'
+                     r.final_time_hundredths = NULL, r.final_status = 'not_qualified'
                  WHERE p.event_id = ? AND p.id NOT IN ($placeholders)"
             )->execute($params);
             $stmt = $this->pdo->prepare(
@@ -209,7 +203,7 @@ final class FinalistService
         $this->pdo->prepare(
             'UPDATE results r JOIN participants p ON p.id = r.participant_id
              SET r.finalist_confirmed = 0, r.is_finalist = 0,
-                 r.final_time_tenths = NULL, r.final_status = "not_qualified"
+                 r.final_time_hundredths = NULL, r.final_status = "not_qualified"
              WHERE p.event_id = :event_id'
         )->execute(['event_id' => $eventId]);
     }

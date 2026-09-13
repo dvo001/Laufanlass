@@ -123,3 +123,13 @@ Nach dem Upload pruefen:
 
 Wenn private Dateien sichtbar sind, muss der Hoster den DocumentRoot auf
 `public/` setzen oder `.htaccess`/`mod_rewrite` aktivieren.
+
+## Bestehende Installation auf Hundertstelsekunden aktualisieren
+
+App fuer die Dauer des Updates offline nehmen und die Datenbank sichern.
+In phpMyAdmin oder Adminer einmalig
+`database/migrations/20260913_hundredths.sql` importieren und die neuen
+Programmdateien hochladen. Erst danach die App wieder freigeben.
+Vorhandene Zeiten werden korrekt umgerechnet, beispielsweise von `01:23.4`
+auf `01:23.40`. Bei Neuinstallationen mit dem aktuellen Schema entfaellt diese
+Migration.

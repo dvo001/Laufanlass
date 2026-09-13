@@ -134,3 +134,25 @@ php -v
 apache2ctl configtest
 sudo tail -f /var/log/apache2/sportlauf_error.log
 ```
+
+## Zeiten in Hundertstelsekunden
+
+Qualifikations- und Finalzeiten werden als ganze Hundertstelsekunden gespeichert
+und ueberall mit zwei Nachkommastellen angezeigt, auch in Ranglisten und Exporten.
+Eingaben wie `1:23.45`, `83,45`, `83.4` und `83` sind erlaubt; die Anzeige lautet
+entsprechend `01:23.45`, `01:23.45`, `01:23.40` und `01:23.00`.
+
+Bestehende Installationen benoetigen beim Update einmalig die folgende Migration.
+Die App waehrend des Updates offline nehmen, die Datenbank sichern, die Migration
+importieren und den neuen Programmcode bereitstellen, bevor die App wieder
+freigegeben wird:
+
+```bash
+mysql -u sportlauf_user -p sportlauf < database/migrations/20260913_hundredths.sql
+```
+
+Die Migration rechnet vorhandene Zehntelsekunden in Hundertstelsekunden um
+(`834` wird `8340`, also weiterhin 83,4 Sekunden). Fehlende Zeiten bleiben leer.
+Bei Neuinstallationen mit dem aktuellen `database/schema.sql` diese Migration
+nicht ausfuehren. Die urspruenglichen Konzeptdokumente unter `docs/CODEX_*`
+beschreiben noch den frueheren Stand mit Zehntelsekunden.

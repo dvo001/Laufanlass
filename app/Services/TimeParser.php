@@ -18,33 +18,32 @@ final class TimeParser
             throw new InvalidArgumentException('Negative Zeiten sind ungültig.');
         }
 
-        if (preg_match('/^(\d{1,2}):([0-5]?\d)(?:[.,](\d))?$/', $value, $m)) {
+        if (preg_match('/^(\d{1,2}):([0-5]?\d)(?:[.,](\d{1,2}))?$/', $value, $m)) {
             $minutes = (int)$m[1];
             $seconds = (int)$m[2];
-            $tenths = isset($m[3]) ? (int)$m[3] : 0;
-            return (($minutes * 60) + $seconds) * 10 + $tenths;
+            $hundredths = (int)str_pad($m[3] ?? '', 2, '0');
+            return (($minutes * 60) + $seconds) * 100 + $hundredths;
         }
 
-        if (preg_match('/^\d+(?:[.,]\d)?$/', $value)) {
-            $normalized = str_replace(',', '.', $value);
-            return (int)round(((float)$normalized) * 10);
+        if (preg_match('/^(\d+)(?:[.,](\d{1,2}))?$/', $value, $m)) {
+            return (int)$m[1] * 100 + (int)str_pad($m[2] ?? '', 2, '0');
         }
 
-        throw new InvalidArgumentException('Zeitformat ungültig. Erlaubt sind z. B. 1:23.4, 1:23, 83.4 oder 83.');
+        throw new InvalidArgumentException('Zeitformat ungültig. Erlaubt sind z. B. 1:23.45, 1:23, 83.45 oder 83 (Punkt oder Komma, maximal zwei Nachkommastellen).');
     }
 
-    public static function format(?int $tenths): string
+    public static function format(?int $hundredths): string
     {
-        if ($tenths === null) {
+        if ($hundredths === null) {
             return '';
         }
 
-        $minutes = intdiv($tenths, 600);
-        $remaining = $tenths % 600;
-        $seconds = intdiv($remaining, 10);
-        $decimal = $remaining % 10;
+        $minutes = intdiv($hundredths, 6000);
+        $remaining = $hundredths % 6000;
+        $seconds = intdiv($remaining, 100);
+        $decimal = $remaining % 100;
 
-        return sprintf('%02d:%02d.%d', $minutes, $seconds, $decimal);
+        return sprintf('%02d:%02d.%02d', $minutes, $seconds, $decimal);
     }
 
     public static function best(?int $run1, ?int $run2): ?int

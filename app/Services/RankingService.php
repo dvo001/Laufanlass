@@ -19,7 +19,7 @@ final class RankingService
 
         foreach ($groups as $groupKey => $groupRows) {
             usort($groupRows, self::qualificationSorter(...));
-            $ranked[$groupKey] = self::assignRanks($groupRows, 'best_qualification_time_tenths');
+            $ranked[$groupKey] = self::assignRanks($groupRows, 'best_qualification_time_hundredths');
         }
 
         return $ranked;
@@ -34,7 +34,7 @@ final class RankingService
         foreach ($groups as $groupKey => $groupRows) {
             if ((int)($groupRows[0]['has_final'] ?? 1) !== 1) {
                 usort($groupRows, self::qualificationSorter(...));
-                $groupRows = self::assignRanks($groupRows, 'best_qualification_time_tenths');
+                $groupRows = self::assignRanks($groupRows, 'best_qualification_time_hundredths');
                 foreach ($groupRows as &$row) {
                     $row['ranking_segment'] = 'Qualifikation (kein Finale)';
                 }
@@ -51,12 +51,12 @@ final class RankingService
     public static function rankFinalGroup(array $groupRows): array
     {
         $finalistsWithTime = array_values(array_filter($groupRows, static function (array $row): bool {
-            return (int)$row['finalist_confirmed'] === 1 && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
+            return (int)$row['finalist_confirmed'] === 1 && $row['final_time_hundredths'] !== null && $row['final_status'] === 'valid';
         }));
         $finalistsWithoutTime = array_values(array_filter($groupRows, static function (array $row): bool {
             return (int)$row['finalist_confirmed'] === 1
                 && $row['final_status'] !== 'absent'
-                && !($row['final_time_tenths'] !== null && $row['final_status'] === 'valid');
+                && !($row['final_time_hundredths'] !== null && $row['final_status'] === 'valid');
         }));
         $nonFinalists = array_values(array_filter($groupRows, static function (array $row): bool {
             return (int)$row['finalist_confirmed'] !== 1 || $row['final_status'] === 'absent';
@@ -89,28 +89,28 @@ final class RankingService
     {
         $ranked = [];
         foreach ($rows as $row) {
-            $qualificationTime = $row['best_qualification_time_tenths'] !== null
-                ? (int)$row['best_qualification_time_tenths']
+            $qualificationTime = $row['best_qualification_time_hundredths'] !== null
+                ? (int)$row['best_qualification_time_hundredths']
                 : null;
-            $finalTime = $row['final_status'] === 'valid' && $row['final_time_tenths'] !== null
-                ? (int)$row['final_time_tenths']
+            $finalTime = $row['final_status'] === 'valid' && $row['final_time_hundredths'] !== null
+                ? (int)$row['final_time_hundredths']
                 : null;
             if ($qualificationTime === null && $finalTime === null) {
                 continue;
             }
 
-            $row['daily_time_tenths'] = $finalTime !== null && ($qualificationTime === null || $finalTime < $qualificationTime)
+            $row['daily_time_hundredths'] = $finalTime !== null && ($qualificationTime === null || $finalTime < $qualificationTime)
                 ? $finalTime
                 : $qualificationTime;
             $row['daily_time_source'] = $finalTime !== null && $finalTime === $qualificationTime
                 ? 'Qualifikation und Finale'
-                : ($row['daily_time_tenths'] === $finalTime ? 'Finale' : 'Qualifikation');
+                : ($row['daily_time_hundredths'] === $finalTime ? 'Finale' : 'Qualifikation');
             $ranked[] = $row;
         }
 
         usort($ranked, static fn (array $a, array $b): int =>
-            [$a['daily_time_tenths'], $a['last_name'], $a['first_name']]
-            <=> [$b['daily_time_tenths'], $b['last_name'], $b['first_name']]
+            [$a['daily_time_hundredths'], $a['last_name'], $a['first_name']]
+            <=> [$b['daily_time_hundredths'], $b['last_name'], $b['first_name']]
         );
         foreach ($ranked as $index => &$row) {
             $row['award_rank'] = $index + 1;
@@ -124,17 +124,17 @@ final class RankingService
     {
         $stmt = $this->pdo->prepare(
             'SELECT p.*, c.name AS category_name, c.sort_order,
-                    r.run1_time_tenths, r.run2_time_tenths, r.best_qualification_time_tenths,
-                    r.is_finalist, r.finalist_confirmed, r.final_time_tenths, c.has_final,
-                    r.qualification_status, r.final_status
+                    r.run1_time_hundredths, r.run2_time_hundredths, r.best_qualification_time_hundredths,
+                    r.is_finalist, r.finalist_confirmed, r.final_time_hundredths, c.has_final,
+                    r.qualification_status, r.final_status, r.notes AS result_notes
              FROM participants p
              JOIN categories c ON c.id = p.category_id
              JOIN results r ON r.participant_id = p.id
              WHERE p.event_id = :event_id
                AND c.active = 1
-               AND r.best_qualification_time_tenths IS NOT NULL
+               AND r.best_qualification_time_hundredths IS NOT NULL
                AND r.qualification_status = "valid"
-             ORDER BY c.sort_order, c.name, p.gender, r.best_qualification_time_tenths, p.last_name, p.first_name'
+             ORDER BY c.sort_order, c.name, p.gender, r.best_qualification_time_hundredths, p.last_name, p.first_name'
         );
         $stmt->execute(['event_id' => $eventId]);
 
@@ -166,7 +166,7 @@ final class RankingService
                 $previousTime = $time;
             }
             $row['rank'] = $rank;
-            $row['ranking_time_tenths'] = $time;
+            $row['ranking_time_hundredths'] = $time;
         }
 
         return $rows;
@@ -183,15 +183,15 @@ final class RankingService
             $position++;
             $isConfirmedFinalist = (int)$row['finalist_confirmed'] === 1;
             $isPresentWithoutRun = $isConfirmedFinalist && $row['final_status'] === 'present_no_run';
-            $hasValidFinalTime = $isConfirmedFinalist && $row['final_time_tenths'] !== null && $row['final_status'] === 'valid';
+            $hasValidFinalTime = $isConfirmedFinalist && $row['final_time_hundredths'] !== null && $row['final_status'] === 'valid';
             $rankBucket = $hasValidFinalTime ? 'final-time' : ($isConfirmedFinalist ? 'final-no-time' : 'qualification');
             $row['ranking_segment'] = $hasValidFinalTime
                 ? 'Finale'
                 : ($isConfirmedFinalist ? 'Finale: ' . $row['final_status'] : 'Qualifikation');
-            $row['ranking_time_tenths'] = $hasValidFinalTime ? $row['final_time_tenths'] : $row['best_qualification_time_tenths'];
-            if ($previousTime === null || (int)$row['ranking_time_tenths'] !== (int)$previousTime || $previousRankBucket !== $rankBucket) {
+            $row['ranking_time_hundredths'] = $hasValidFinalTime ? $row['final_time_hundredths'] : $row['best_qualification_time_hundredths'];
+            if ($previousTime === null || (int)$row['ranking_time_hundredths'] !== (int)$previousTime || $previousRankBucket !== $rankBucket) {
                 $rank = $position;
-                $previousTime = $row['ranking_time_tenths'];
+                $previousTime = $row['ranking_time_hundredths'];
                 $previousRankBucket = $rankBucket;
             }
             $row['rank'] = $rank;
@@ -206,13 +206,13 @@ final class RankingService
 
     private static function qualificationSorter(array $a, array $b): int
     {
-        return [(int)$a['best_qualification_time_tenths'], $a['last_name'], $a['first_name']]
-            <=> [(int)$b['best_qualification_time_tenths'], $b['last_name'], $b['first_name']];
+        return [(int)$a['best_qualification_time_hundredths'], $a['last_name'], $a['first_name']]
+            <=> [(int)$b['best_qualification_time_hundredths'], $b['last_name'], $b['first_name']];
     }
 
     private static function finalSorter(array $a, array $b): int
     {
-        return [(int)$a['final_time_tenths'], $a['last_name'], $a['first_name']]
-            <=> [(int)$b['final_time_tenths'], $b['last_name'], $b['first_name']];
+        return [(int)$a['final_time_hundredths'], $a['last_name'], $a['first_name']]
+            <=> [(int)$b['final_time_hundredths'], $b['last_name'], $b['first_name']];
     }
 }

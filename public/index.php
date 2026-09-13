@@ -98,6 +98,19 @@ function requireEvent(): array
 
 function render(string $title, callable $content): void
 {
+    // Erst vollstaendig rendern, damit Fehler keine zweite Seite in die erste schreiben.
+    $bufferLevel = ob_get_level();
+    ob_start();
+    try {
+        $content();
+        $contentHtml = ob_get_clean();
+    } catch (Throwable $error) {
+        while (ob_get_level() > $bufferLevel) {
+            ob_end_clean();
+        }
+        throw $error;
+    }
+
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
     $links = [
         '/' => 'Dashboard',
@@ -138,7 +151,7 @@ function render(string $title, callable $content): void
     <main class="main">
         <h1><?= e($title) ?></h1>
         <?php if ($flash): ?><div class="flash"><?= e($flash) ?></div><?php endif; ?>
-        <?php $content(); ?>
+        <?= $contentHtml ?>
     </main>
 </div>
 </body>
@@ -1333,5 +1346,13 @@ try {
     render('Nicht gefunden', static fn () => print '<div class="error">Route nicht gefunden.</div>');
 } catch (Throwable $e) {
     http_response_code(500);
-    render('Fehler', static fn () => print '<div class="error">' . e($e->getMessage()) . '</div>');
+    $message = $e->getMessage();
+    if ($e instanceof PDOException && (string)$e->getCode() === '42S22'
+        && str_contains($message, '_time_hundredths')) {
+        $message = 'Das Datenbank-Update für Hundertstelsekunden fehlt oder ist unvollständig. '
+            . 'Bitte die App offline nehmen, die Datenbank sichern und die Migration '
+            . 'database/migrations/20260913_hundredths.sql prüfen und bei noch nicht erfolgtem Update '
+            . 'einmalig in phpMyAdmin oder Adminer importieren. Danach die App wieder freigeben.';
+    }
+    render('Fehler', static fn () => print '<div class="error">' . e($message) . '</div>');
 }
